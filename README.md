@@ -1,30 +1,39 @@
 # Deadlock Personal Intelligence
 
-Privates Dashboard für die Analyse der eigenen Deadlock-Matches, Helden und Builds.
+Persönliches Deadlock-Dashboard für Matches, Helden, Builds und die eigene
+Entwicklung. Die Website wird statisch über GitHub Pages veröffentlicht.
 
-## Aktueller Stand
+## Hosting
 
-- Professionelles, responsives Dashboard-Fundament
-- Sichere serverseitige Konfiguration für Zugangsdaten
-- Status-Endpunkt unter `/api/status`, der nur den Einrichtungsstatus ausgibt
-- Noch keine erfundenen oder unbestätigten Deadlock-Datenquellen
+Der Workflow `Deploy Deadlock Dashboard to Pages` prüft und veröffentlicht die
+Website bei jedem Push auf `main`. Die statische Seite benötigt zur Laufzeit
+keinen Server und gibt keine API-Schlüssel an den Browser weiter.
 
-## Lokale Einrichtung
+## Datenprinzip
 
-1. Abhängigkeiten installieren: `npm install`
-2. `.env.example` als `.env.local` kopieren
-3. Steam Web API Key unter <https://steamcommunity.com/dev/apikey> erzeugen
-4. `STEAM_API_KEY` und `STEAM_ID64` in `.env.local` eintragen
-5. Entwicklungsserver starten: `npm run dev`
+Wie beim Übertreiber-Dashboard werden Live-Daten später innerhalb einer GitHub
+Action abgerufen und als statische Dashboard-Daten ausgegeben:
 
-## Sicherheit
+1. GitHub Action liest den API-Key aus einem Repository-Secret.
+2. Das Datenskript ruft die Deadlock- und Steam-Daten ab.
+3. Tests prüfen die generierte Ausgabe.
+4. GitHub Pages veröffentlicht ausschließlich die fertigen statischen Dateien.
 
-Echte Zugangsdaten gehören ausschließlich in `.env.local`. Diese Datei wird von
-Git ignoriert. In Browser-Code dürfen keine geheimen Schlüssel mit
-`NEXT_PUBLIC_` veröffentlicht werden.
+Die Deadlock-Datenquelle wird erst integriert, nachdem ihre Verfügbarkeit mit
+dem eigenen Steam-Konto verifiziert wurde.
 
-## Geplante nächste Phase
+## Lokale Prüfung
 
-Bevor Matchdaten angebunden werden, wird die verfügbare Deadlock-Datenquelle mit
-dem eigenen Steam-Konto geprüft. Erst danach werden Datenmodell, Abrufintervall
-und die Auswertungen für 30, 60 und 100 Matches festgelegt.
+Voraussetzung: Node.js 20 oder neuer.
+
+```text
+npm test
+```
+
+Zum lokalen Anzeigen kann `index.html` direkt im Browser geöffnet werden.
+
+## Zugangsdaten
+
+Echte Zugangsdaten dürfen niemals in `.env`, HTML, JavaScript oder Git landen.
+Für die spätere Datenaktualisierung werden sie unter
+`Settings → Secrets and variables → Actions` als GitHub-Secrets hinterlegt.

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Privates Deadlock-Dashboard für Matches, Helden, Builds und persönliche Entwicklung."
+    />
+    <title>Deadlock Personal Intelligence</title>
+    <link rel="icon" href="./public/favicon.svg" />
+    <link rel="stylesheet" href="./dashboard.css" />
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <div class="grid-glow" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="Deadlock Personal Intelligence Startseite">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span class="brand-copy">
+            <strong>DEADLOCK</strong>
+            <small>PERSONAL INTELLIGENCE</small>
+          </span>
+        </a>
+
+        <div class="private-state">
+          <span class="pulse" aria-hidden="true"></span>
+          Persönliches Dashboard
+        </div>
+      </header>
+
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow">PERSONAL PERFORMANCE SYSTEM // PHASE 01</p>
+          <h1>Deine Matches.<span>Dein Muster.</span></h1>
+          <p class="lead">
+            Ein persönliches Deadlock-Dashboard, das aus Matchdaten klare
+            Entscheidungen für Helden, Builds und deinen nächsten Schritt macht.
+          </p>
+
+          <div class="scope-row" aria-label="Geplanter Analyseumfang">
+            <span>Matches</span>
+            <span>Helden</span>
+            <span>Builds</span>
+            <span>Entwicklung</span>
+          </div>
+        </div>
+
+        <aside class="setup-card" aria-labelledby="setup-title">
+          <div class="setup-head">
+            <div>
+              <p class="card-kicker">SYSTEM STATUS</p>
+              <h2 id="setup-title">Datenzugang einrichten</h2>
+            </div>
+            <span class="status-badge">1/4 bereit</span>
+          </div>
+
+          <div class="progress" aria-label="25 Prozent der Einrichtung abgeschlossen">
+            <span style="width: 25%"></span>
+          </div>
+
+          <ol class="setup-list">
+            <li class="is-ready">
+              <span class="step-number">01</span>
+              <span class="step-copy">
+                <strong>Projektfundament</strong>
+                <small>GitHub Pages und Repository vorbereitet</small>
+              </span>
+              <span class="step-state">Bereit</span>
+            </li>
+            <li>
+              <span class="step-number">02</span>
+              <span class="step-copy">
+                <strong>Steam Web API</strong>
+                <small>STEAM_API_KEY als GitHub Secret hinterlegen</small>
+              </span>
+              <span class="step-state">Offen</span>
+            </li>
+            <li>
+              <span class="step-number">03</span>
+              <span class="step-copy">
+                <strong>Spielerprofil</strong>
+                <small>STEAM_ID64 mit deinem Account verbinden</small>
+              </span>
+              <span class="step-state">Offen</span>
+            </li>
+            <li>
+              <span class="step-number">04</span>
+              <span class="step-copy">
+                <strong>Deadlock-Matchdaten</strong>
+                <small>Datenquelle prüfen und anbinden</small>
+              </span>
+              <span class="step-state">Offen</span>
+            </li>
+          </ol>
+
+          <p class="security-note">
+            API-Schlüssel werden ausschließlich von GitHub Actions verwendet und
+            niemals an den Browser oder die veröffentlichte Website ausgeliefert.
+          </p>
+        </aside>
+      </section>
+
+      <section class="blueprint" aria-labelledby="blueprint-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">DASHBOARD BLUEPRINT</p>
+            <h2 id="blueprint-title">Gebaut für deine Entscheidungen</h2>
+          </div>
+          <span class="waiting-state">
+            <span aria-hidden="true"></span> Wartet auf Datenquelle
+          </span>
+        </div>
+
+        <div class="module-grid">
+          <article class="module-card">
+            <div class="module-topline"><span>01</span><span class="module-signal"></span></div>
+            <h3>Match Intelligence</h3>
+            <p>Verlauf, Ergebnis, Dauer, Team und die entscheidenden Wendepunkte jedes Matches.</p>
+            <div class="module-metric"><strong>30 / 60 / 100</strong><span>Matches</span></div>
+          </article>
+          <article class="module-card">
+            <div class="module-topline"><span>02</span><span class="module-signal"></span></div>
+            <h3>Hero Performance</h3>
+            <p>Winrate, KDA, Souls pro Minute und Wirkung im direkten Heldenvergleich.</p>
+            <div class="module-metric"><strong>—</strong><span>Daten ausstehend</span></div>
+          </article>
+          <article class="module-card">
+            <div class="module-topline"><span>03</span><span class="module-signal"></span></div>
+            <h3>Build Analytics</h3>
+            <p>Items, Timings und Builds mit dem tatsächlichen Match-Ausgang verbinden.</p>
+            <div class="module-metric"><strong>—</strong><span>Daten ausstehend</span></div>
+          </article>
+        </div>
+      </section>
+
+      <footer>
+        <span>DEADLOCK PERSONAL INTELLIGENCE</span>
+        <span>Hosted on GitHub Pages · No credentials exposed</span>
+      </footer>
+    </main>
+  </body>
+</html>
