@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   buildDashboardData,
+  buildProcessedMatchesUrl,
+  mergeMatchSources,
   parseSteamProfileReference,
   steamId64ToAccountId,
 } from "../scripts/fetch-dashboard-data.mjs";
@@ -69,4 +71,32 @@ test("raw match history is normalized and capped", () => {
   assert.equal(result.heroes["1"].name, "Hero One");
   assert.equal(result.ranks["7"].name, "Oracle");
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
+});
+
+test("processed match query is scoped and capped", () => {
+  const url = buildProcessedMatchesUrl("https://api.deadlock-api.com/", 64_862, 500);
+  const query = url.searchParams.get("query");
+
+  assert.equal(url.origin, "https://api.deadlock-api.com");
+  assert.match(query, /account_id = 64862/);
+  assert.match(query, /LIMIT 100/);
+  assert.match(query, /player_match_outcome/);
+});
+
+test("processed matches supplement stale player history", () => {
+  const history = [
+    { match_id: 100, start_time: 1_000, ranked_delta: 25, player_kills: 7 },
+  ];
+  const processed = [
+    { match_id: 101, start_time: 2_000, player_kills: 9 },
+    { match_id: 100, start_time: 1_000, player_kills: 6, player_deaths: 4 },
+  ];
+
+  const merged = mergeMatchSources(history, processed);
+
+  assert.equal(merged.length, 2);
+  assert.deepEqual(merged.find((match) => match.match_id === 101), processed[0]);
+  assert.equal(merged.find((match) => match.match_id === 100).player_kills, 7);
+  assert.equal(merged.find((match) => match.match_id === 100).player_deaths, 4);
+  assert.equal(merged.find((match) => match.match_id === 100).ranked_delta, 25);
 });

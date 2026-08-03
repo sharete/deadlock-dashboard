@@ -169,6 +169,55 @@ function normalizeMatch(match) {
   };
 }
 
+export function buildProcessedMatchesUrl(apiBase, accountId, maxMatches = 100) {
+  const limit = boundedInteger(maxMatches, 100, 30, 100);
+  const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/sql`);
+  url.searchParams.set(
+    "query",
+    [
+      "SELECT",
+      "match_id,",
+      "toUnixTimestamp(start_time) AS start_time,",
+      "duration_s AS match_duration_s,",
+      "toInt8(match_mode) AS match_mode,",
+      "toInt8(winning_team) AS match_result,",
+      "toInt8(team) AS player_team,",
+      "hero_id,",
+      "player_level AS hero_level,",
+      "kills AS player_kills,",
+      "deaths AS player_deaths,",
+      "assists AS player_assists,",
+      "net_worth, last_hits, denies,",
+      "toInt8(player_match_outcome) AS player_match_outcome,",
+      "player_rank_initial_display_rank AS ranked_display_badge,",
+      "player_rank_desired_progress_change AS ranked_delta",
+      "FROM match_player FINAL",
+      `WHERE account_id = ${boundedInteger(accountId, 0, 0, 4_294_967_295)}`,
+      "ORDER BY start_time DESC",
+      `LIMIT ${limit}`,
+    ].join(" "),
+  );
+  return url;
+}
+
+export function mergeMatchSources(matchHistory, processedMatches) {
+  const byMatchId = new Map();
+
+  for (const match of processedMatches) {
+    byMatchId.set(String(match.match_id), match);
+  }
+
+  // The player-history endpoint contains useful rank fields when available.
+  // Prefer those fields while retaining processed matches that are not present
+  // in the history cache yet.
+  for (const match of matchHistory) {
+    const key = String(match.match_id);
+    byMatchId.set(key, { ...byMatchId.get(key), ...match });
+  }
+
+  return [...byMatchId.values()];
+}
+
 function heroAccentColor(colors) {
   if (typeof colors?.style_hex === "string" && /^#[0-9a-f]{6}$/i.test(colors.style_hex)) {
     return colors.style_hex;
@@ -321,12 +370,21 @@ async function main() {
     ? { "X-API-Key": process.env.DEADLOCK_API_KEY }
     : {};
 
-  const [profilePayload, gamesPayload, matchHistory, heroAssets, rankAssets] = await Promise.all([
+  const processedMatchesUrl = buildProcessedMatchesUrl(apiBase, accountId, config.maxMatches);
+
+  const [profilePayload, gamesPayload, matchHistory, processedMatches, heroAssets, rankAssets] = await Promise.all([
     fetchJson(profileUrl, { label: "Steam-Profil" }),
     fetchJson(gamesUrl, { label: "Steam-Spielzeit" }),
     fetchJson(`${apiBase}/v1/players/${accountId}/match-history`, {
       label: "Deadlock-Matchverlauf",
       headers: deadlockHeaders,
+    }),
+    fetchJson(processedMatchesUrl, {
+      label: "Verarbeitete Deadlock-Matches",
+      headers: deadlockHeaders,
+    }).catch((error) => {
+      console.warn(`Direkte Matchabfrage nicht verfügbar: ${error.message}`);
+      return [];
     }),
     fetchJson(`${apiBase}/v1/assets/heroes?language=german&only_active=true`, {
       label: "Deadlock-Helden",
@@ -341,15 +399,20 @@ async function main() {
   const profile = profilePayload?.response?.players?.[0];
   if (!profile) throw new Error("Steam hat für die angegebene SteamID64 kein Profil geliefert.");
   if (!Array.isArray(matchHistory)) throw new Error("Der Deadlock-Matchverlauf hat ein ungültiges Format.");
+  if (!Array.isArray(processedMatches)) {
+    throw new Error("Die verarbeiteten Deadlock-Matches haben ein ungültiges Format.");
+  }
   if (!Array.isArray(heroAssets) || !Array.isArray(rankAssets)) {
     throw new Error("Die Deadlock-Assetdaten haben ein ungültiges Format.");
   }
+
+  const currentMatchHistory = mergeMatchSources(matchHistory, processedMatches);
 
   const dashboard = buildDashboardData({
     steamId64,
     profile,
     ownedGames: gamesPayload?.response?.games ?? [],
-    matchHistory,
+    matchHistory: currentMatchHistory,
     heroAssets,
     rankAssets,
     maxMatches: config.maxMatches,
