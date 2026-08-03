@@ -6,6 +6,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test --test-isolation=none tests/static-site.test.mjs"
+    "test": "node tests/static-site.test.mjs"
   }
 }
