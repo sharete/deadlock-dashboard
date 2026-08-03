@@ -6,6 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node tests/static-site.test.mjs"
+    "generate": "node scripts/fetch-dashboard-data.mjs",
+    "test": "node tests/run.mjs"
   }
 }

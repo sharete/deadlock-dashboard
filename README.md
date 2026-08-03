@@ -1,39 +1,55 @@
 # Deadlock Personal Intelligence
 
-Persönliches Deadlock-Dashboard für Matches, Helden, Builds und die eigene
-Entwicklung. Die Website wird statisch über GitHub Pages veröffentlicht.
+Persönliches Deadlock-Performance-Dashboard für Matches, Helden und
+Rangentwicklung. Die Website wird statisch und kostenlos über GitHub Pages
+veröffentlicht.
 
-## Hosting
+## Datenfluss
 
-Der Workflow `Deploy Deadlock Dashboard to Pages` prüft und veröffentlicht die
-Website bei jedem Push auf `main`. Die statische Seite benötigt zur Laufzeit
-keinen Server und gibt keine API-Schlüssel an den Browser weiter.
+1. GitHub Actions liest `STEAM_API_KEY` aus den Repository-Secrets.
+2. Das Datenskript ordnet das konfigurierte Steam-Profil der Deadlock-Account-ID zu.
+3. Profilinformationen kommen aus der Steam Web API.
+4. Matchverlauf, Helden und Ränge kommen aus dem offenen Community-Projekt
+   [Deadlock API](https://api.deadlock-api.com/docs).
+5. GitHub Pages veröffentlicht ausschließlich die aufbereiteten JSON-Daten und
+   die statische Website. Zugangsdaten gelangen nie in den Browser.
 
-## Datenprinzip
+Die Deadlock API ist ein Community-Projekt und nicht mit Valve verbunden.
 
-Wie beim Übertreiber-Dashboard werden Live-Daten später innerhalb einer GitHub
-Action abgerufen und als statische Dashboard-Daten ausgegeben:
+## Konfiguration
 
-1. GitHub Action liest den API-Key aus einem Repository-Secret.
-2. Das Datenskript ruft die Deadlock- und Steam-Daten ab.
-3. Tests prüfen die generierte Ausgabe.
-4. GitHub Pages veröffentlicht ausschließlich die fertigen statischen Dateien.
+Die öffentliche Steam-Profil-URL wird in `config/dashboard.json` eingetragen.
+Alternativ kann `STEAM_ID64` als Repository-Secret oder Repository-Variable
+gesetzt werden.
 
-Die Deadlock-Datenquelle wird erst integriert, nachdem ihre Verfügbarkeit mit
-dem eigenen Steam-Konto verifiziert wurde.
+Erforderliches GitHub Secret:
+
+- `STEAM_API_KEY`
+
+Optionale Werte:
+
+- `STEAM_ID64` – überschreibt die Profilangabe aus der Konfiguration
+- `DEADLOCK_API_KEY` – erhöht je nach Konto die Limits der Community-API
+
+## Aktualisierung
+
+Der Workflow `Deploy Deadlock Dashboard to Pages` läuft bei Änderungen, manuell
+und zweimal pro Stunde. Er prüft die Anwendung, lädt aktuelle Daten und
+veröffentlicht anschließend das fertige Pages-Artefakt.
 
 ## Lokale Prüfung
 
-Voraussetzung: Node.js 20 oder neuer.
+Voraussetzung ist Node.js 20 oder neuer.
 
 ```text
 npm test
 ```
 
-Zum lokalen Anzeigen kann `index.html` direkt im Browser geöffnet werden.
+Für eine echte lokale Aktualisierung werden `STEAM_API_KEY` und entweder eine
+Profilangabe in der Konfiguration oder `STEAM_ID64` benötigt:
 
-## Zugangsdaten
+```text
+npm run generate
+```
 
-Echte Zugangsdaten dürfen niemals in `.env`, HTML, JavaScript oder Git landen.
-Für die spätere Datenaktualisierung werden sie unter
-`Settings → Secrets and variables → Actions` als GitHub-Secrets hinterlegt.
+Zugangsdaten dürfen niemals in HTML, JavaScript, JSON oder Git eingecheckt werden.

@@ -5,6 +5,8 @@ on:
     branches:
       - main
   workflow_dispatch:
+  schedule:
+    - cron: "17,47 * * * *"
 
 permissions:
   contents: read
@@ -34,16 +36,24 @@ jobs:
       - name: Statische Ausgabe prüfen
         run: npm test
 
+      - name: Persönliche Deadlock-Daten aktualisieren
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          STEAM_ID64: ${{ secrets.STEAM_ID64 || vars.STEAM_ID64 }}
+          DEADLOCK_API_KEY: ${{ secrets.DEADLOCK_API_KEY }}
+        run: npm run generate
+
       - name: GitHub Pages vorbereiten
         uses: actions/configure-pages@v5
 
       - name: Veröffentlichungsdateien zusammenstellen
         shell: bash
         run: |
-          mkdir -p _site/app _site/public
-          cp index.html dashboard.css .nojekyll _site/
+          mkdir -p _site/app _site/public _site/data
+          cp index.html dashboard.css dashboard.js .nojekyll _site/
           cp app/globals.css _site/app/globals.css
-          cp public/favicon.svg _site/public/favicon.svg
+          cp -r public/. _site/public/
+          cp data/dashboard.json _site/data/dashboard.json
 
       - name: Pages-Artefakt hochladen
         uses: actions/upload-pages-artifact@v3

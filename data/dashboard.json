@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "state": "setup",
+  "generatedAt": null,
+  "profile": null,
+  "matches": [],
+  "heroes": {},
+  "ranks": {},
+  "setup": {
+    "message": "Steam-Profil noch nicht zugeordnet.",
+    "completed": ["hosting", "steamApiKey"],
+    "missing": ["steamProfile", "matchData"]
+  }
+}

@@ -4,17 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#080b0a" />
     <meta
       name="description"
-      content="Privates Deadlock-Dashboard für Matches, Helden, Builds und persönliche Entwicklung."
+      content="Persönliches Deadlock-Performance-Dashboard für Matches, Helden und Rangentwicklung."
     />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Deadlock Personal Intelligence" />
+    <meta property="og:description" content="Deine Matches. Dein Muster. Persönliche Deadlock-Performance auf einen Blick." />
+    <meta property="og:url" content="https://sharete.github.io/deadlock-dashboard/" />
+    <meta property="og:image" content="https://sharete.github.io/deadlock-dashboard/public/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Deadlock Personal Intelligence" />
+    <meta name="twitter:description" content="Deine Matches. Dein Muster. Persönliche Deadlock-Performance auf einen Blick." />
+    <meta name="twitter:image" content="https://sharete.github.io/deadlock-dashboard/public/og.png" />
     <title>Deadlock Personal Intelligence</title>
     <link rel="icon" href="./public/favicon.svg" />
     <link rel="stylesheet" href="./dashboard.css" />
+    <script type="module" src="./dashboard.js"></script>
   </head>
   <body>
-    <main class="dashboard-shell">
-      <div class="grid-glow" aria-hidden="true"></div>
+    <div class="site-shell">
+      <div class="ambient-grid" aria-hidden="true"></div>
 
       <header class="topbar">
         <a class="brand" href="#top" aria-label="Deadlock Personal Intelligence Startseite">
@@ -24,122 +35,181 @@
             <small>PERSONAL INTELLIGENCE</small>
           </span>
         </a>
-
-        <div class="private-state">
-          <span class="pulse" aria-hidden="true"></span>
-          Persönliches Dashboard
+        <div class="live-state" id="live-state">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="live-state-label">Daten werden geprüft</span>
         </div>
       </header>
 
-      <section class="hero" id="top">
-        <div class="hero-copy">
-          <p class="eyebrow">PERSONAL PERFORMANCE SYSTEM // PHASE 01</p>
-          <h1>Deine Matches.<span>Dein Muster.</span></h1>
-          <p class="lead">
-            Ein persönliches Deadlock-Dashboard, das aus Matchdaten klare
-            Entscheidungen für Helden, Builds und deinen nächsten Schritt macht.
-          </p>
-
-          <div class="scope-row" aria-label="Geplanter Analyseumfang">
-            <span>Matches</span>
-            <span>Helden</span>
-            <span>Builds</span>
-            <span>Entwicklung</span>
+      <main id="top">
+        <section class="setup-view" id="setup-view" aria-labelledby="setup-title">
+          <div class="setup-intro">
+            <p class="eyebrow">PERSONAL PERFORMANCE SYSTEM // SETUP</p>
+            <h1 id="setup-title">Fast bereit.<span>Ein Profil fehlt.</span></h1>
+            <p>
+              Der sichere Datenzugang steht. Jetzt muss nur noch dein öffentliches
+              Steam-Profil mit dem Dashboard verbunden werden.
+            </p>
           </div>
-        </div>
 
-        <aside class="setup-card" aria-labelledby="setup-title">
-          <div class="setup-head">
-            <div>
-              <p class="card-kicker">SYSTEM STATUS</p>
-              <h2 id="setup-title">Datenzugang einrichten</h2>
+          <aside class="setup-card">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">SYSTEM STATUS</p>
+                <h2>Datenzugang</h2>
+              </div>
+              <span class="state-badge">2/4 bereit</span>
             </div>
-            <span class="status-badge">1/4 bereit</span>
-          </div>
+            <div class="setup-progress" aria-label="50 Prozent der Einrichtung abgeschlossen">
+              <span></span>
+            </div>
+            <ol class="setup-list">
+              <li class="is-ready"><span>01</span><strong>GitHub Pages</strong><small>Online</small></li>
+              <li class="is-ready"><span>02</span><strong>Steam Web API</strong><small>Geschützt</small></li>
+              <li><span>03</span><strong>Steam-Profil</strong><small>SteamID64 fehlt</small></li>
+              <li><span>04</span><strong>Deadlock-Matches</strong><small>Wartet auf Profil</small></li>
+            </ol>
+            <p class="security-note">
+              API-Schlüssel bleiben in GitHub Actions. Die veröffentlichte Website erhält
+              ausschließlich fertig aufbereitete Statistikdaten.
+            </p>
+          </aside>
+        </section>
 
-          <div class="progress" aria-label="25 Prozent der Einrichtung abgeschlossen">
-            <span style="width: 25%"></span>
-          </div>
+        <div class="dashboard-view" id="dashboard-view" hidden>
+          <section class="profile-hero" aria-labelledby="profile-name">
+            <div class="profile-identity">
+              <img id="profile-avatar" class="profile-avatar" alt="" width="112" height="112" />
+              <div>
+                <p class="eyebrow">PRIVATE COMMAND CENTER</p>
+                <div class="profile-name-line">
+                  <span id="country-flag" class="country-flag" aria-hidden="true"></span>
+                  <h1 id="profile-name">Steam Player</h1>
+                </div>
+                <div class="profile-meta">
+                  <span id="current-rank">Rang wird geladen</span>
+                  <span id="deadlock-hours">— Spielstunden</span>
+                  <span id="last-match">Letztes Match —</span>
+                </div>
+              </div>
+            </div>
 
-          <ol class="setup-list">
-            <li class="is-ready">
-              <span class="step-number">01</span>
-              <span class="step-copy">
-                <strong>Projektfundament</strong>
-                <small>GitHub Pages und Repository vorbereitet</small>
-              </span>
-              <span class="step-state">Bereit</span>
-            </li>
-            <li>
-              <span class="step-number">02</span>
-              <span class="step-copy">
-                <strong>Steam Web API</strong>
-                <small>STEAM_API_KEY als GitHub Secret hinterlegen</small>
-              </span>
-              <span class="step-state">Offen</span>
-            </li>
-            <li>
-              <span class="step-number">03</span>
-              <span class="step-copy">
-                <strong>Spielerprofil</strong>
-                <small>STEAM_ID64 mit deinem Account verbinden</small>
-              </span>
-              <span class="step-state">Offen</span>
-            </li>
-            <li>
-              <span class="step-number">04</span>
-              <span class="step-copy">
-                <strong>Deadlock-Matchdaten</strong>
-                <small>Datenquelle prüfen und anbinden</small>
-              </span>
-              <span class="step-state">Offen</span>
-            </li>
-          </ol>
+            <div class="profile-actions">
+              <div class="window-switcher" role="group" aria-label="Analysezeitraum">
+                <button type="button" data-window="30" aria-pressed="true">30</button>
+                <button type="button" data-window="60" aria-pressed="false">60</button>
+                <button type="button" data-window="100" aria-pressed="false">100</button>
+              </div>
+              <a id="steam-profile-link" class="external-link" href="#" target="_blank" rel="noreferrer">
+                Steam ↗
+              </a>
+            </div>
+          </section>
 
-          <p class="security-note">
-            API-Schlüssel werden ausschließlich von GitHub Actions verwendet und
-            niemals an den Browser oder die veröffentlichte Website ausgeliefert.
-          </p>
-        </aside>
-      </section>
+          <section class="metric-grid" aria-label="Leistungsübersicht">
+            <article class="metric-card metric-primary">
+              <span class="metric-label">Winrate</span>
+              <strong id="metric-winrate">—</strong>
+              <span id="metric-record">—</span>
+              <div class="metric-bar"><span id="winrate-bar"></span></div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">KDA</span>
+              <strong id="metric-kda">—</strong>
+              <span>Kills + Assists pro Tod</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Souls / Min.</span>
+              <strong id="metric-spm">—</strong>
+              <span id="metric-networth">— Ø Net Worth</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Matchdauer</span>
+              <strong id="metric-duration">—</strong>
+              <span id="metric-sample">— analysiert</span>
+            </article>
+          </section>
 
-      <section class="blueprint" aria-labelledby="blueprint-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">DASHBOARD BLUEPRINT</p>
-            <h2 id="blueprint-title">Gebaut für deine Entscheidungen</h2>
-          </div>
-          <span class="waiting-state">
-            <span aria-hidden="true"></span> Wartet auf Datenquelle
-          </span>
+          <section class="insight-layout">
+            <article class="panel rank-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="panel-kicker">RANK SIGNAL</p>
+                  <h2>Rangentwicklung</h2>
+                </div>
+                <span class="panel-context" id="rank-context">Ranked Matches</span>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="rank-chart" aria-label="Verlauf des Deadlock-Rangs"></canvas>
+                <p class="empty-state" id="rank-empty" hidden>Für einen Verlauf fehlen noch Rangdaten.</p>
+              </div>
+            </article>
+
+            <aside class="panel form-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="panel-kicker">MOMENTUM</p>
+                  <h2>Aktuelle Form</h2>
+                </div>
+              </div>
+              <div class="form-score">
+                <strong id="form-score">—</strong>
+                <span>Siege aus den letzten 5</span>
+              </div>
+              <div class="form-dots" id="form-dots" aria-label="Ergebnisse der letzten fünf Matches"></div>
+              <dl class="form-details">
+                <div><dt>Serie</dt><dd id="current-streak">—</dd></div>
+                <div><dt>Bester Held</dt><dd id="best-hero">—</dd></div>
+                <div><dt>Peak Match</dt><dd id="peak-match">—</dd></div>
+              </dl>
+            </aside>
+          </section>
+
+          <section class="content-section" aria-labelledby="heroes-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">HERO PERFORMANCE</p>
+                <h2 id="heroes-title">Dein Hero Pool</h2>
+              </div>
+              <p>Sortiert nach Picks im gewählten Zeitraum.</p>
+            </div>
+            <div class="hero-grid" id="hero-grid"></div>
+          </section>
+
+          <section class="content-section" aria-labelledby="matches-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">MATCH INTELLIGENCE</p>
+                <h2 id="matches-title">Letzte Matches</h2>
+              </div>
+              <p id="match-coverage">—</p>
+            </div>
+            <div class="match-table-wrap">
+              <table class="match-table">
+                <thead>
+                  <tr>
+                    <th>Match</th>
+                    <th>Held</th>
+                    <th>Ergebnis</th>
+                    <th>K / D / A</th>
+                    <th>Souls / Min.</th>
+                    <th>Dauer</th>
+                    <th>Rang</th>
+                  </tr>
+                </thead>
+                <tbody id="match-table-body"></tbody>
+              </table>
+            </div>
+          </section>
         </div>
-
-        <div class="module-grid">
-          <article class="module-card">
-            <div class="module-topline"><span>01</span><span class="module-signal"></span></div>
-            <h3>Match Intelligence</h3>
-            <p>Verlauf, Ergebnis, Dauer, Team und die entscheidenden Wendepunkte jedes Matches.</p>
-            <div class="module-metric"><strong>30 / 60 / 100</strong><span>Matches</span></div>
-          </article>
-          <article class="module-card">
-            <div class="module-topline"><span>02</span><span class="module-signal"></span></div>
-            <h3>Hero Performance</h3>
-            <p>Winrate, KDA, Souls pro Minute und Wirkung im direkten Heldenvergleich.</p>
-            <div class="module-metric"><strong>—</strong><span>Daten ausstehend</span></div>
-          </article>
-          <article class="module-card">
-            <div class="module-topline"><span>03</span><span class="module-signal"></span></div>
-            <h3>Build Analytics</h3>
-            <p>Items, Timings und Builds mit dem tatsächlichen Match-Ausgang verbinden.</p>
-            <div class="module-metric"><strong>—</strong><span>Daten ausstehend</span></div>
-          </article>
-        </div>
-      </section>
+      </main>
 
       <footer>
         <span>DEADLOCK PERSONAL INTELLIGENCE</span>
-        <span>Hosted on GitHub Pages · No credentials exposed</span>
+        <span id="footer-update">Noch keine Live-Daten · Hosted on GitHub Pages</span>
       </footer>
-    </main>
+    </div>
+
+    <noscript>Für die interaktive Auswertung muss JavaScript aktiviert sein.</noscript>
   </body>
 </html>
