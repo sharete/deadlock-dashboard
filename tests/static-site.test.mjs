@@ -49,6 +49,8 @@ test("the Pages workflow generates and deploys static data", async () => {
   assert.match(workflow, /actions\/upload-pages-artifact@v3/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /path: _site/);
+  assert.match(workflow, /cp app\/globals\.css _site\/dashboard\.css/);
+  assert.doesNotMatch(workflow, /cp index\.html dashboard\.css/);
   assert.match(workflow, /cp data\/dashboard\.json/);
   assert.match(workflow, /dashboard\.js\?v=\$\{GITHUB_SHA\}-\$\{GITHUB_RUN_ID\}/);
   assert.doesNotMatch(workflow, /STEAM_API_KEY:\s*[A-Za-z0-9]{20,}/);

@@ -49,10 +49,10 @@ jobs:
       - name: Veröffentlichungsdateien zusammenstellen
         shell: bash
         run: |
-          mkdir -p _site/app _site/public _site/data
-          cp index.html dashboard.css dashboard.js .nojekyll _site/
+          mkdir -p _site/public _site/data
+          cp index.html dashboard.js .nojekyll _site/
+          cp app/globals.css _site/dashboard.css
           sed -i "s|./dashboard.css|./dashboard.css?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|; s|./dashboard.js|./dashboard.js?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|" _site/index.html
-          cp app/globals.css _site/app/globals.css
           cp -r public/. _site/public/
           cp data/dashboard.json _site/data/dashboard.json
 
