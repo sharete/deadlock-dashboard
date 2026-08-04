@@ -391,6 +391,71 @@ export function buildBasicMatchPlayersUrl(apiBase, matchIds) {
   return url;
 }
 
+export function buildMatchMetadataUrl(apiBase, matchIds) {
+  const ids = [...new Set(matchIds)]
+    .map((matchId) => boundedInteger(matchId, 0, 1, Number.MAX_SAFE_INTEGER))
+    .filter(Boolean)
+    .slice(0, 12);
+  const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/matches/metadata`);
+  for (const matchId of ids) url.searchParams.append("match_ids", String(matchId));
+  for (const [name, value] of Object.entries({
+    include_info: "false",
+    include_more_info: "false",
+    include_objectives: "false",
+    include_mid_boss: "false",
+    include_player_info: "true",
+    include_player_kda: "true",
+    include_player_items: "true",
+    include_player_stats: "false",
+    include_player_final_stats: "true",
+    include_player_death_details: "false",
+  })) {
+    url.searchParams.set(name, value);
+  }
+  url.searchParams.set("limit", String(Math.max(1, ids.length)));
+  return url;
+}
+
+function enumTeamNumber(value) {
+  if (Number.isFinite(Number(value))) return Number(value);
+  const match = String(value ?? "").match(/Team(\d+)/i);
+  return match ? asNumber(match[1], -1) : -1;
+}
+
+export function flattenMatchMetadataPlayers(metadata) {
+  if (!Array.isArray(metadata)) return [];
+  return metadata.flatMap((match) => (Array.isArray(match.players) ? match.players : []).map((player) => {
+    const final = player.final_stats ?? {};
+    const items = Array.isArray(player.items) ? player.items : [];
+    return {
+      match_id: match.match_id,
+      account_id: player.account_id,
+      team: enumTeamNumber(player.team),
+      hero_id: player.hero_id,
+      kills: player.kills,
+      deaths: player.deaths,
+      assists: player.assists,
+      net_worth: player.net_worth,
+      last_hits: player.last_hits,
+      denies: player.denies,
+      assigned_lane: player.assigned_lane,
+      mvp_rank: player.mvp_rank,
+      player_damage: final.player_damage,
+      damage_taken: final.player_damage_taken,
+      player_healing: final.player_healing,
+      damage_mitigated: final.damage_mitigated,
+      boss_damage: final.boss_damage,
+      creep_damage: final.creep_damage,
+      shots_hit: final.shots_hit,
+      shots_missed: final.shots_missed,
+      build_item_ids: items.map((item) => item.item_id),
+      build_times_s: items.map((item) => item.game_time_s),
+      build_sold_times_s: items.map((item) => item.sold_time_s),
+      build_upgrade_ids: items.map((item) => item.upgrade_id),
+    };
+  }));
+}
+
 export function buildHeroMatchupsUrl(apiBase, accountId) {
   const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/sql`);
   url.searchParams.set(
@@ -1065,21 +1130,35 @@ async function main() {
     .sort((a, b) => asNumber(b.start_time) - asNumber(a.start_time))
     .slice(0, 12)
     .map((match) => match.match_id);
-  const matchPlayers = await fetchJson(buildMatchPlayersUrl(apiBase, rosterMatchIds), {
+  let matchPlayers = await fetchJson(buildMatchPlayersUrl(apiBase, rosterMatchIds), {
     label: "Teamaufstellungen der letzten Matches",
     headers: deadlockHeaders,
     retries: 4,
   }).catch((error) => {
     console.warn(`Erweiterte Teamaufstellungen nicht verfügbar: ${error.message}`);
-    return fetchJson(buildBasicMatchPlayersUrl(apiBase, rosterMatchIds), {
+    return [];
+  });
+  if (!Array.isArray(matchPlayers) || !matchPlayers.length) {
+    matchPlayers = await fetchJson(buildBasicMatchPlayersUrl(apiBase, rosterMatchIds), {
       label: "Basis-Teamaufstellungen der letzten Matches",
       headers: deadlockHeaders,
       retries: 4,
-    }).catch((fallbackError) => {
-      console.warn(`Teamaufstellungen nicht verfügbar: ${fallbackError.message}`);
+    }).catch((error) => {
+      console.warn(`Basis-Teamaufstellungen nicht verfügbar: ${error.message}`);
       return [];
     });
-  });
+  }
+  if (!Array.isArray(matchPlayers) || !matchPlayers.length) {
+    const metadata = await fetchJson(buildMatchMetadataUrl(apiBase, rosterMatchIds), {
+      label: "Match-Metadaten der letzten Matches",
+      headers: deadlockHeaders,
+      retries: 4,
+    }).catch((error) => {
+      console.warn(`Match-Metadaten nicht verfügbar: ${error.message}`);
+      return [];
+    });
+    matchPlayers = flattenMatchMetadataPlayers(metadata);
+  }
   if (!Array.isArray(matchPlayers)) {
     throw new Error("Die Teamaufstellungen haben ein ungültiges Format.");
   }

@@ -7,10 +7,12 @@ import {
   buildHeroCoach,
   buildHeroMatchupsUrl,
   buildMatchPlayersUrl,
+  buildMatchMetadataUrl,
   buildPublishedDataFiles,
   buildProcessedMatchesUrl,
   buildRankContext,
   buildTeamEconomy,
+  flattenMatchMetadataPlayers,
   mergeMatchSources,
   parseSteamProfileReference,
   steamId64ToAccountId,
@@ -285,6 +287,34 @@ test("team rosters are limited to the visible match details", () => {
   assert.match(fallbackQuery, /match_id IN \(100,101\)/);
   assert.match(fallbackQuery, /assigned_lane/);
   assert.doesNotMatch(fallbackQuery, /timeline_net_worth/);
+
+  const metadataUrl = buildMatchMetadataUrl("https://api.deadlock-api.com/", [100, 101]);
+  assert.deepEqual(metadataUrl.searchParams.getAll("match_ids"), ["100", "101"]);
+  assert.equal(metadataUrl.searchParams.get("include_player_items"), "true");
+});
+
+test("match metadata fallback is flattened into the roster contract", () => {
+  const rows = flattenMatchMetadataPlayers([{
+    match_id: 500,
+    players: [{
+      account_id: 1,
+      team: "Team0",
+      hero_id: 13,
+      kills: 8,
+      deaths: 4,
+      assists: 10,
+      net_worth: 42_000,
+      assigned_lane: 2,
+      items: [{ item_id: 100, game_time_s: 120, sold_time_s: 0, upgrade_id: 5 }],
+      final_stats: { player_damage: 30_000, player_healing: 4_000, shots_hit: 400 },
+    }],
+  }]);
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].team, 0);
+  assert.equal(rows[0].player_damage, 30_000);
+  assert.deepEqual(rows[0].build_item_ids, [100]);
+  assert.deepEqual(rows[0].build_upgrade_ids, [5]);
 });
 
 test("team economy aggregates aligned player timelines without publishing raw roster curves", () => {
