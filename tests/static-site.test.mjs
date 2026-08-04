@@ -28,6 +28,8 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /HERO_SAMPLE_MIN = 3/);
   assert.match(script, /function openHeroDetail/);
   assert.match(script, /function openMatchDetail/);
+  assert.match(script, /function renderRosterPlayerDetail/);
+  assert.match(script, /Build und Werte von/);
   assert.match(script, /function buildSessions/);
   assert.doesNotMatch(`${html}\n${script}`, /STEAM_API_KEY\s*=|NEXT_PUBLIC_/);
 });

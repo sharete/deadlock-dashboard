@@ -67,8 +67,15 @@ test("the complete raw match history is normalized", () => {
     ownedGames: [{ appid: 1422450, playtime_forever: 600 }],
     matchHistory: matches,
     matchPlayers: [
-      { match_id: 9_000, account_id: 1, hero_id: 1, team: 0, kills: 10, deaths: 5, assists: 8, net_worth: 45_000 },
-      { match_id: 9_000, account_id: 2, hero_id: 2, team: 1, kills: 7, deaths: 6, assists: 4, net_worth: 40_000 },
+      {
+        match_id: 9_000, account_id: 1, hero_id: 1, team: 0, kills: 10, deaths: 5, assists: 8, net_worth: 45_000,
+        player_damage: 52_000, player_healing: 4_500, build_item_ids: [100], build_times_s: [120],
+      },
+      {
+        match_id: 9_000, account_id: 2, hero_id: 2, team: 1, kills: 7, deaths: 6, assists: 4, net_worth: 40_000,
+        player_damage: 39_000, player_healing: 7_500, last_hits: 180, denies: 3,
+        build_item_ids: [300], build_times_s: [90], build_upgrade_ids: [123],
+      },
     ],
     heroAssets: [
       { id: 1, name: "Hero One", images: { icon_hero_card_webp: "https://example.com/one.webp" } },
@@ -77,6 +84,7 @@ test("the complete raw match history is normalized", () => {
     itemAssets: [
       { id: 100, name: "Test Item", type: "upgrade", image_webp: "https://example.com/item.webp", item_tier: 2, cost: 1_600 },
       { id: 200, name: "Test Ability", type: "ability", image_webp: "https://example.com/ability.webp" },
+      { id: 300, name: "Roster Ability", type: "ability", image_webp: "https://example.com/roster-ability.webp" },
     ],
     heroStats: [
       { hero_id: 1, matches: 100, wins: 55, total_kills: 1_000, total_deaths: 500, total_assists: 750, total_net_worth: 4_000_000, total_player_damage: 5_000_000 },
@@ -95,8 +103,11 @@ test("the complete raw match history is normalized", () => {
   assert.equal(result.matches[0].build[1].soldAtSeconds, 1_400);
   assert.equal(result.matches[0].players.length, 2);
   assert.equal(result.matches[0].players[0].isSelf, true);
+  assert.equal(result.matches[0].players[1].playerHealing, 7_500);
+  assert.equal(result.matches[0].players[1].build[0].itemId, 300);
   assert.equal(result.heroes["1"].name, "Hero One");
   assert.equal(result.buildAssets["100"].name, "Test Item");
+  assert.equal(result.buildAssets["300"].name, "Roster Ability");
   assert.equal(Math.round(result.heroBenchmarks["1"].winrate), 55);
   assert.equal(result.ranks["7"].name, "Oracle");
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
@@ -146,6 +157,8 @@ test("team rosters are limited to the visible match details", () => {
   assert.match(query, /match_id IN \(100,101,102\)/);
   assert.match(query, /account_id/);
   assert.match(query, /net_worth/);
+  assert.match(query, /max_player_damage AS player_damage/);
+  assert.match(query, /items\.item_id AS build_item_ids/);
   assert.doesNotMatch(query, /undefined|NaN/);
 });
 

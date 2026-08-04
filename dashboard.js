@@ -480,13 +480,16 @@ function renderHeroSort() {
   }
 }
 
-function rosterColumn(title, players) {
+function rosterColumn(title, players, onSelect) {
   const column = create("div", "roster-column");
   column.append(create("h4", "", title));
   const list = create("div", "roster-list");
   for (const player of players) {
     const hero = heroFor(player.heroId);
-    const item = create("div", `roster-player${player.isSelf ? " is-self" : ""}`);
+    const item = create("button", `roster-player${player.isSelf ? " is-self" : ""}`);
+    item.type = "button";
+    item.setAttribute("aria-pressed", "false");
+    item.setAttribute("aria-label", `Build und Werte von ${hero.name} anzeigen`);
     const identity = create("span", "roster-identity");
     if (hero.image) {
       const image = create("img");
@@ -499,10 +502,54 @@ function rosterColumn(title, players) {
     copy.append(create("small", "", `${numberFormat.format(player.netWorth)} Net Worth`));
     identity.append(copy);
     item.append(identity, create("strong", "roster-kda", `${player.kills}/${player.deaths}/${player.assists}`));
+    item.addEventListener("click", () => onSelect(player, item));
     list.append(item);
   }
   column.append(list);
   return column;
+}
+
+function renderRosterPlayerDetail(match, player, target) {
+  const hero = heroFor(player.heroId);
+  const accuracyTotal = player.shotsHit + player.shotsMissed;
+  const accuracy = accuracyTotal ? (player.shotsHit / accuracyTotal) * 100 : 0;
+  const content = create("div", "roster-player-detail-content");
+  const header = create("div", "roster-player-detail-header");
+  const identity = create("div", "roster-player-detail-identity");
+  if (hero.image) {
+    const image = create("img");
+    image.src = hero.image;
+    image.alt = "";
+    identity.append(image);
+  }
+  const copy = create("div");
+  copy.append(
+    create("span", "eyebrow", player.isSelf ? "DEINE PERFORMANCE" : player.team === match.team ? "DEIN TEAM" : "GEGNERTEAM"),
+    create("h4", "", hero.name),
+    create("p", "", `${player.kills}/${player.deaths}/${player.assists} · ${numberFormat.format(player.netWorth)} Net Worth`),
+  );
+  identity.append(copy);
+  header.append(identity, create("span", "roster-detail-hint", "Spieler wechseln: anderen Hero anklicken"));
+  content.append(header);
+  content.append(metricGrid([
+    { label: "Player Damage", value: numberFormat.format(player.playerDamage) },
+    { label: "Damage erhalten", value: numberFormat.format(player.damageTaken) },
+    { label: "Healing", value: numberFormat.format(player.playerHealing) },
+    { label: "Mitigation", value: numberFormat.format(player.damageMitigated) },
+    { label: "Boss Damage", value: numberFormat.format(player.bossDamage) },
+    { label: "Creep Damage", value: numberFormat.format(player.creepDamage) },
+    { label: "Trefferquote", value: accuracyTotal ? `${percentFormat.format(accuracy)}%` : "—", note: accuracyTotal ? `${numberFormat.format(player.shotsHit)} Treffer` : "Keine Daten" },
+    { label: "Last Hits / Denies", value: `${numberFormat.format(player.lastHits)} / ${numberFormat.format(player.denies)}` },
+  ]));
+
+  const itemTimeline = buildTimeline(player, "upgrade", "Item-Build", "Kaufreihenfolge und Zeitpunkte dieses Spielers.");
+  const abilityTimeline = buildTimeline(player, "ability", "Ability-Reihenfolge", "Zeitliche Reihenfolge der Ability-Upgrades dieses Spielers.");
+  if (itemTimeline) content.append(itemTimeline);
+  if (abilityTimeline) content.append(abilityTimeline);
+  if (!itemTimeline && !abilityTimeline) {
+    content.append(create("p", "sample-notice", "Für diesen Spieler sind keine Build-Ereignisse verfügbar."));
+  }
+  target.replaceChildren(content);
 }
 
 function buildTimeline(match, type, title, description) {
@@ -585,19 +632,31 @@ function openMatchDetail(match) {
   body.append(comparison);
 
   if (match.players?.length) {
-    const teams = detailSection("Teamaufstellung", "Dein Hero ist in der eigenen Aufstellung hervorgehoben.");
+    const teams = detailSection("Teamaufstellung", "Hero anklicken, um dessen vollständigen Build und Performance-Werte zu öffnen.");
     const grid = create("div", "roster-grid");
+    const playerDetail = create("div", "roster-player-detail");
+    playerDetail.append(create("p", "roster-player-prompt", "Wähle einen Hero aus der Teamaufstellung aus."));
     const ownTeam = match.players.filter((player) => player.team === match.team);
     const enemyTeam = match.players.filter((player) => player.team !== match.team);
-    grid.append(rosterColumn("Dein Team", ownTeam), rosterColumn("Gegnerteam", enemyTeam));
-    teams.append(grid);
+    const selectPlayer = (player, button) => {
+      for (const sibling of grid.querySelectorAll(".roster-player")) {
+        sibling.classList.toggle("is-selected", sibling === button);
+        sibling.setAttribute("aria-pressed", String(sibling === button));
+      }
+      renderRosterPlayerDetail(match, player, playerDetail);
+    };
+    grid.append(
+      rosterColumn("Dein Team", ownTeam, selectPlayer),
+      rosterColumn("Gegnerteam", enemyTeam, selectPlayer),
+    );
+    teams.append(grid, playerDetail);
     body.append(teams);
+  } else {
+    const itemTimeline = buildTimeline(match, "upgrade", "Item-Build", "Kaufreihenfolge und Zeitpunkte innerhalb des Matches.");
+    const abilityTimeline = buildTimeline(match, "ability", "Ability-Reihenfolge", "Zeitliche Reihenfolge deiner Ability-Upgrades.");
+    if (itemTimeline) body.append(itemTimeline);
+    if (abilityTimeline) body.append(abilityTimeline);
   }
-
-  const itemTimeline = buildTimeline(match, "upgrade", "Item-Build", "Kaufreihenfolge und Zeitpunkte innerhalb des Matches.");
-  const abilityTimeline = buildTimeline(match, "ability", "Ability-Reihenfolge", "Zeitliche Reihenfolge deiner Ability-Upgrades.");
-  if (itemTimeline) body.append(itemTimeline);
-  if (abilityTimeline) body.append(abilityTimeline);
 
   openDetail({
     eyebrow: "MATCH INTELLIGENCE",

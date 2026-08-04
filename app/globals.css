@@ -318,14 +318,26 @@ button { color: inherit; }
 .roster-column { padding: 14px; border-radius: 13px; background: rgba(255,255,255,0.018); }
 .roster-column h4 { margin: 0 0 11px; color: var(--muted); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
 .roster-list { display: grid; gap: 6px; }
-.roster-player { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 9px; border: 1px solid transparent; border-radius: 10px; }
+.roster-player { width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 9px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
+.roster-player:hover { border-color: rgba(215,255,100,0.16); background: rgba(255,255,255,0.025); }
+.roster-player:focus-visible { outline: 2px solid var(--acid); outline-offset: 1px; }
 .roster-player.is-self { border-color: rgba(215,255,100,0.23); background: rgba(215,255,100,0.055); }
+.roster-player.is-selected { border-color: rgba(215,255,100,0.58); background: rgba(215,255,100,0.11); box-shadow: inset 3px 0 0 var(--acid); }
 .roster-identity { min-width: 0; display: flex; align-items: center; gap: 9px; }
 .roster-identity img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; object-position: center top; }
 .roster-identity > span { min-width: 0; display: grid; gap: 3px; }
 .roster-identity strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .roster-identity small { color: var(--quiet); font-size: 8px; }
 .roster-kda { color: var(--muted); font-size: 10px; }
+.roster-player-detail { min-height: 94px; margin-top: 14px; padding: 16px; border: 1px dashed rgba(226,237,231,0.14); border-radius: 14px; background: rgba(0,0,0,0.1); }
+.roster-player-prompt { min-height: 60px; display: grid; place-items: center; margin: 0; color: var(--quiet); font-size: 10px; text-align: center; }
+.roster-player-detail-content { display: grid; gap: 14px; }
+.roster-player-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.roster-player-detail-identity { display: flex; align-items: center; gap: 12px; }
+.roster-player-detail-identity img { width: 54px; height: 54px; border-radius: 11px; object-fit: cover; object-position: center top; background: #080b0a; }
+.roster-player-detail-identity h4 { margin: 2px 0 3px; font-size: 19px; letter-spacing: -0.035em; }
+.roster-player-detail-identity p { margin: 0; color: var(--muted); font-size: 9px; }
+.roster-detail-hint { color: var(--quiet); font-size: 8px; text-align: right; }
 .build-timeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .build-event { min-width: 0; display: flex; align-items: center; gap: 9px; min-height: 57px; padding: 8px; border-radius: 11px; background: rgba(255,255,255,0.022); }
 .build-image { width: 37px; height: 37px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 8px; background: #101614; color: var(--orange); font-size: 10px; }
@@ -381,6 +393,9 @@ noscript { position: fixed; inset: auto 20px 20px; z-index: 4; padding: 12px 16p
   .detail-section-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
   .detail-section-heading p { text-align: left; }
   .roster-grid { grid-template-columns: 1fr; }
+  .roster-player-detail { padding: 12px; }
+  .roster-player-detail-header { align-items: flex-start; flex-direction: column; }
+  .roster-detail-hint { text-align: left; }
   .build-timeline { grid-template-columns: repeat(2, 1fr); }
   footer { padding-block: 24px; align-items: flex-start; flex-direction: column; }
 }

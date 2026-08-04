@@ -151,14 +151,23 @@ function matchMode(value) {
   }[asNumber(value)] ?? "Unknown";
 }
 
+function normalizeBuild(row) {
+  const itemIds = asNumberArray(row.build_item_ids);
+  const times = asNumberArray(row.build_times_s);
+  const soldTimes = asNumberArray(row.build_sold_times_s);
+  const upgradeIds = asNumberArray(row.build_upgrade_ids);
+  return itemIds.map((itemId, index) => ({
+    itemId,
+    atSeconds: times[index] ?? 0,
+    soldAtSeconds: soldTimes[index] ?? 0,
+    upgradeId: upgradeIds[index] ?? 0,
+  }));
+}
+
 function normalizeMatch(match) {
   const durationSeconds = Math.max(0, asNumber(match.match_duration_s));
   const netWorth = Math.max(0, asNumber(match.net_worth));
   const startedAt = asNumber(match.start_time);
-  const buildItemIds = asNumberArray(match.build_item_ids);
-  const buildTimes = asNumberArray(match.build_times_s);
-  const buildSoldTimes = asNumberArray(match.build_sold_times_s);
-  const buildUpgradeIds = asNumberArray(match.build_upgrade_ids);
 
   return {
     id: String(match.match_id),
@@ -185,12 +194,7 @@ function normalizeMatch(match) {
     creepDamage: asNumber(match.creep_damage),
     shotsHit: asNumber(match.shots_hit),
     shotsMissed: asNumber(match.shots_missed),
-    build: buildItemIds.map((itemId, index) => ({
-      itemId,
-      atSeconds: buildTimes[index] ?? 0,
-      soldAtSeconds: buildSoldTimes[index] ?? 0,
-      upgradeId: buildUpgradeIds[index] ?? 0,
-    })),
+    build: normalizeBuild(match),
     rankBadge: match.ranked_display_badge == null ? null : asNumber(match.ranked_display_badge),
     rankDelta: match.ranked_delta == null ? null : asNumber(match.ranked_delta),
   };
@@ -244,7 +248,14 @@ export function buildMatchPlayersUrl(apiBase, matchIds) {
     "query",
     [
       "SELECT match_id, account_id, toInt8(team) AS team, hero_id,",
-      "kills, deaths, assists, net_worth",
+      "kills, deaths, assists, net_worth, last_hits, denies,",
+      "max_player_damage AS player_damage, max_player_damage_taken AS damage_taken,",
+      "arrayMax(stats.player_healing) AS player_healing,",
+      "arrayMax(stats.damage_mitigated) AS damage_mitigated,",
+      "max_boss_damage AS boss_damage, max_creep_damage AS creep_damage,",
+      "max_shots_hit AS shots_hit, max_shots_missed AS shots_missed,",
+      "items.item_id AS build_item_ids, items.game_time_s AS build_times_s,",
+      "items.sold_time_s AS build_sold_times_s, items.upgrade_id AS build_upgrade_ids",
       "FROM match_player FINAL",
       `WHERE match_id IN (${ids.length ? ids.join(",") : "0"})`,
       "ORDER BY match_id DESC, team ASC, net_worth DESC",
@@ -313,6 +324,17 @@ export function buildDashboardData({
       deaths: asNumber(player.deaths),
       assists: asNumber(player.assists),
       netWorth: asNumber(player.net_worth),
+      lastHits: asNumber(player.last_hits),
+      denies: asNumber(player.denies),
+      playerDamage: asNumber(player.player_damage),
+      damageTaken: asNumber(player.damage_taken),
+      playerHealing: asNumber(player.player_healing),
+      damageMitigated: asNumber(player.damage_mitigated),
+      bossDamage: asNumber(player.boss_damage),
+      creepDamage: asNumber(player.creep_damage),
+      shotsHit: asNumber(player.shots_hit),
+      shotsMissed: asNumber(player.shots_missed),
+      build: normalizeBuild(player),
       isSelf: asNumber(player.account_id) === accountId,
     });
     playersByMatch.set(matchId, roster);
@@ -344,7 +366,12 @@ export function buildDashboardData({
   );
 
   const usedBuildAssetIds = new Set(
-    matches.flatMap((match) => match.build.map((event) => event.itemId)),
+    [
+      ...matches.flatMap((match) => match.build.map((event) => event.itemId)),
+      ...[...playersByMatch.values()].flatMap((players) =>
+        players.flatMap((player) => player.build.map((event) => event.itemId)),
+      ),
+    ],
   );
   const buildAssets = Object.fromEntries(
     itemAssets
