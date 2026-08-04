@@ -298,6 +298,148 @@ function detailSection(title, description) {
   return section;
 }
 
+function progressPeriod(matches) {
+  const dates = matches
+    .map((match) => match.startedAt && new Date(match.startedAt))
+    .filter((date) => date && !Number.isNaN(date.getTime()))
+    .sort((a, b) => a - b);
+  if (!dates.length) return "Zeitraum unbekannt";
+  const format = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", year: "2-digit" });
+  return dates.length === 1
+    ? format.format(dates[0])
+    : `${format.format(dates[0])} – ${format.format(dates.at(-1))}`;
+}
+
+function progressSummary(matches) {
+  const summary = summarize(matches);
+  const heroGroups = groupHeroes(matches);
+  return {
+    ...summary,
+    damage: average(matches.map((match) => match.playerDamage)),
+    deaths: average(matches.map((match) => match.deaths)),
+    heroCount: heroGroups.length,
+    favoriteHero: heroGroups[0] ?? null,
+  };
+}
+
+function progressWindowBar(selected, onSelect) {
+  const bar = create("div", "hero-choice-bar progress-window-bar");
+  for (const size of [10, 20, 30]) {
+    const button = create("button", "hero-choice", `${size} Matches`);
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(size === selected));
+    button.addEventListener("click", () => onSelect(size));
+    bar.append(button);
+  }
+  return bar;
+}
+
+function openProgressComparison() {
+  const matches = selectedMatches();
+  const body = create("div", "detail-stack");
+  const controls = create("div");
+  const content = create("div", "detail-stack");
+  let sampleSize = 10;
+
+  const render = () => {
+    controls.replaceChildren(progressWindowBar(sampleSize, (size) => {
+      sampleSize = size;
+      render();
+    }));
+    content.replaceChildren();
+
+    const recentMatches = matches.slice(0, sampleSize);
+    const previousMatches = matches.slice(sampleSize, sampleSize * 2);
+    if (recentMatches.length < sampleSize || previousMatches.length < sampleSize) {
+      content.append(create(
+        "p",
+        "sample-notice",
+        `Für diesen Vergleich werden ${sampleSize * 2} Matches benötigt. Aktuell sind ${matches.length} Matches verfügbar.`,
+      ));
+      return;
+    }
+
+    const recent = progressSummary(recentMatches);
+    const previous = progressSummary(previousMatches);
+    const metrics = [
+      { label: "Winrate", current: recent.winrate, before: previous.winrate, format: (value) => `${percentFormat.format(value)}%`, suffix: " Pkt." },
+      { label: "KDA", current: recent.kda, before: previous.kda, format: (value) => decimalFormat.format(value) },
+      { label: "Souls / Min.", current: recent.spm, before: previous.spm, format: (value) => numberFormat.format(Math.round(value)) },
+      { label: "Player Damage", current: recent.damage, before: previous.damage, format: (value) => numberFormat.format(Math.round(value)) },
+      { label: "Net Worth", current: recent.netWorth, before: previous.netWorth, format: (value) => numberFormat.format(Math.round(value)) },
+      { label: "Deaths / Match", current: recent.deaths, before: previous.deaths, format: (value) => decimalFormat.format(value), lowerIsBetter: true },
+    ];
+    const improved = metrics.filter((metric) => (
+      metric.lowerIsBetter ? metric.current < metric.before : metric.current > metric.before
+    )).length;
+    const regressed = metrics.filter((metric) => (
+      metric.lowerIsBetter ? metric.current > metric.before : metric.current < metric.before
+    )).length;
+    const trend = improved > regressed ? "Aufwärtstrend" : improved < regressed ? "Rückgang" : "Ausgeglichen";
+    const trendTone = improved > regressed ? "positive" : improved < regressed ? "negative" : "";
+
+    content.append(metricGrid([
+      { label: "Gesamttrend", value: trend, tone: trendTone, note: `${improved} von 6 Kernwerten verbessert` },
+      { label: "Aktueller Zeitraum", value: `${sampleSize} Matches`, note: progressPeriod(recentMatches) },
+      { label: "Vergleichszeitraum", value: `${sampleSize} Matches`, note: progressPeriod(previousMatches) },
+      { label: "Bilanz aktuell", value: `${recent.wins}W · ${recent.losses}L`, tone: recent.winrate >= previous.winrate ? "positive" : "negative", note: `${percentFormat.format(recent.winrate)}% Winrate` },
+    ]));
+
+    const comparison = detailSection(
+      "Leistungsentwicklung",
+      `Die letzten ${sampleSize} Matches im direkten Vergleich mit den ${sampleSize} Matches davor.`,
+    );
+    const rows = create("div", "comparison-list");
+    for (const metric of metrics) {
+      const item = create("div", "comparison-row");
+      const current = create("span");
+      current.append(
+        create("small", "", `${metric.label} · aktuell`),
+        create("strong", "", metric.format(metric.current)),
+      );
+      const delta = metric.current - metric.before;
+      const isBetter = metric.lowerIsBetter ? delta < 0 : delta > 0;
+      const isWorse = metric.lowerIsBetter ? delta > 0 : delta < 0;
+      const reference = create("span", "comparison-reference");
+      reference.append(
+        create("small", "", `Davor ${metric.format(metric.before)}`),
+        create("strong", isBetter ? "positive" : isWorse ? "negative" : "", signedDifference(metric.current, metric.before, metric.suffix || "")),
+      );
+      item.append(current, reference);
+      rows.append(item);
+    }
+    comparison.append(rows);
+    content.append(comparison);
+
+    const recentHero = recent.favoriteHero;
+    const previousHero = previous.favoriteHero;
+    const recentHeroName = recentHero ? heroFor(recentHero.heroId).name : "—";
+    const previousHeroName = previousHero ? heroFor(previousHero.heroId).name : "—";
+    const heroSection = detailSection(
+      "Hero-Veränderung",
+      recentHeroName === previousHeroName
+        ? `Dein Schwerpunkt bleibt bei ${recentHeroName}.`
+        : `Dein Schwerpunkt hat sich von ${previousHeroName} zu ${recentHeroName} verschoben.`,
+    );
+    heroSection.append(metricGrid([
+      { label: "Aktuell meistgespielt", value: recentHeroName, note: recentHero ? `${recentHero.matches} Matches · ${percentFormat.format(recentHero.winrate)}% WR` : "Keine Daten" },
+      { label: "Davor meistgespielt", value: previousHeroName, note: previousHero ? `${previousHero.matches} Matches · ${percentFormat.format(previousHero.winrate)}% WR` : "Keine Daten" },
+      { label: "Hero-Pool aktuell", value: `${recent.heroCount} Heroes`, note: `In den letzten ${sampleSize} Matches` },
+      { label: "Hero-Pool davor", value: `${previous.heroCount} Heroes`, note: `In den ${sampleSize} Matches davor` },
+    ]));
+    content.append(heroSection);
+  };
+
+  render();
+  body.append(controls, content);
+  openDetail({
+    eyebrow: "PERFORMANCE TREND",
+    title: "Fortschrittsvergleich",
+    subtitle: "Gleich große, direkt aufeinanderfolgende Match-Zeiträume – ohne globale Vergleichswerte.",
+    body,
+  });
+}
+
 function coachFor(heroId) {
   return state.data.heroCoach?.[String(heroId)] ?? null;
 }
@@ -1766,6 +1908,7 @@ function showReady(data) {
   byId("coach-button")?.addEventListener("click", openCoach);
   byId("enemy-analysis-button")?.addEventListener("click", openEnemyAnalysis);
   byId("match-archive-button")?.addEventListener("click", openMatchArchive);
+  byId("progress-compare-button")?.addEventListener("click", openProgressComparison);
 
   text(
     "footer-update",
