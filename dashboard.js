@@ -255,6 +255,8 @@ function compactMatchList(matches) {
       const image = create("img");
       image.src = hero.image;
       image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
       identity.append(image);
     }
     const copy = create("span");
@@ -425,6 +427,7 @@ function renderHeroCards(groups) {
       image.src = hero.image;
       image.alt = "";
       image.loading = "lazy";
+      image.decoding = "async";
       visual.append(image);
     }
 
@@ -495,6 +498,8 @@ function rosterColumn(title, players, onSelect) {
       const image = create("img");
       image.src = hero.image;
       image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
       identity.append(image);
     }
     const copy = create("span");
@@ -520,6 +525,8 @@ function renderRosterPlayerDetail(match, player, target) {
     const image = create("img");
     image.src = hero.image;
     image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
     identity.append(image);
   }
   const copy = create("div");
@@ -567,6 +574,8 @@ function buildTimeline(match, type, title, description) {
       const image = create("img");
       image.src = event.asset.image;
       image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
       imageWrap.append(image);
     } else {
       imageWrap.append(create("span", "", String(index + 1)));
@@ -705,6 +714,7 @@ function renderMatches(matches) {
       image.src = hero.image;
       image.alt = "";
       image.loading = "lazy";
+      image.decoding = "async";
       heroWrap.append(image);
     }
     const heroName = document.createElement("span");

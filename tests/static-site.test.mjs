@@ -5,9 +5,10 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("the GitHub Pages entrypoint contains the interactive dashboard", async () => {
-  const [html, script] = await Promise.all([
+  const [html, script, styles] = await Promise.all([
     readFile(new URL("index.html", root), "utf8"),
     readFile(new URL("dashboard.js", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
   ]);
 
   assert.match(html, /<html lang="de">/);
@@ -30,7 +31,11 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /function openMatchDetail/);
   assert.match(script, /function renderRosterPlayerDetail/);
   assert.match(script, /Build und Werte von/);
+  assert.match(script, /image\.decoding = "async"/);
   assert.match(script, /function buildSessions/);
+  assert.match(styles, /\.detail-open main/);
+  assert.match(styles, /content-visibility: auto/);
+  assert.doesNotMatch(styles, /backdrop-filter/);
   assert.doesNotMatch(`${html}\n${script}`, /STEAM_API_KEY\s*=|NEXT_PUBLIC_/);
 });
 
