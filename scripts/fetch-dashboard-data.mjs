@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 const STEAM_ID64_BASE = 76561197960265728n;
 const DEADLOCK_APP_ID = 1422450;
 const DEFAULT_API_BASE = "https://api.deadlock-api.com";
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const RECENT_MATCH_LIMIT = 12;
 const HISTORY_PAGE_SIZE = 100;
 const root = new URL("../", import.meta.url);
@@ -167,6 +167,68 @@ function normalizeBuild(row) {
   }));
 }
 
+function normalizeTimeline(row) {
+  const times = asNumberArray(row.timeline_times_s);
+  if (!times.length) return null;
+  return {
+    times,
+    netWorth: asNumberArray(row.timeline_net_worth),
+    kills: asNumberArray(row.timeline_kills),
+    deaths: asNumberArray(row.timeline_deaths),
+    assists: asNumberArray(row.timeline_assists),
+    playerDamage: asNumberArray(row.timeline_player_damage),
+  };
+}
+
+function timelineValueAt(timeline, time, field = "netWorth") {
+  if (!timeline?.times?.length || !timeline?.[field]?.length) return 0;
+  let value = 0;
+  for (let index = 0; index < timeline.times.length; index += 1) {
+    if (timeline.times[index] > time) break;
+    value = asNumber(timeline[field][index], value);
+  }
+  return value;
+}
+
+function normalizeDeathDetails(row) {
+  const times = asNumberArray(row.death_times_s);
+  const durations = asNumberArray(row.death_durations_s);
+  const timeToKill = asNumberArray(row.death_ttk_s);
+  const killerSlots = asNumberArray(row.death_killer_slots);
+  return times.map((atSeconds, index) => ({
+    atSeconds,
+    durationSeconds: durations[index] ?? 0,
+    timeToKillSeconds: timeToKill[index] ?? null,
+    killerSlot: killerSlots[index] ?? null,
+  }));
+}
+
+function normalizeObjectives(row) {
+  const times = asNumberArray(row.objective_times_s);
+  const types = asNumberArray(row.objective_types);
+  const teams = asNumberArray(row.objective_teams);
+  return times
+    .map((atSeconds, index) => ({
+      atSeconds,
+      type: types[index] ?? -1,
+      team: teams[index] ?? -1,
+    }))
+    .filter((event) => event.atSeconds > 0);
+}
+
+function normalizeMidBoss(row) {
+  const times = asNumberArray(row.mid_boss_times_s);
+  const killedTeams = asNumberArray(row.mid_boss_killed_teams);
+  const claimedTeams = asNumberArray(row.mid_boss_claimed_teams);
+  return times
+    .map((atSeconds, index) => ({
+      atSeconds,
+      killedByTeam: killedTeams[index] ?? -1,
+      claimedByTeam: claimedTeams[index] ?? -1,
+    }))
+    .filter((event) => event.atSeconds > 0);
+}
+
 function normalizeMatch(match) {
   const durationSeconds = Math.max(0, asNumber(match.match_duration_s));
   const netWorth = Math.max(0, asNumber(match.net_worth));
@@ -197,6 +259,16 @@ function normalizeMatch(match) {
     creepDamage: asNumber(match.creep_damage),
     shotsHit: asNumber(match.shots_hit),
     shotsMissed: asNumber(match.shots_missed),
+    assignedLane: asNumber(match.assigned_lane, 0),
+    mvpRank: match.mvp_rank == null ? null : asNumber(match.mvp_rank),
+    averageBadges: [
+      match.average_badge_team0 == null ? null : asNumber(match.average_badge_team0),
+      match.average_badge_team1 == null ? null : asNumber(match.average_badge_team1),
+    ],
+    timeline: normalizeTimeline(match),
+    deathDetails: normalizeDeathDetails(match),
+    objectives: normalizeObjectives(match),
+    midBoss: normalizeMidBoss(match),
     build: normalizeBuild(match),
     rankBadge: match.ranked_display_badge == null ? null : asNumber(match.ranked_display_badge),
     rankDelta: match.ranked_delta == null ? null : asNumber(match.ranked_delta),
@@ -228,6 +300,20 @@ export function buildProcessedMatchesUrl(apiBase, accountId) {
       "max_boss_damage AS boss_damage,",
       "max_creep_damage AS creep_damage,",
       "max_shots_hit AS shots_hit, max_shots_missed AS shots_missed,",
+      "assigned_lane, mvp_rank, average_badge_team0, average_badge_team1,",
+      "stats.time_stamp_s AS timeline_times_s, stats.net_worth AS timeline_net_worth,",
+      "stats.kills AS timeline_kills, stats.deaths AS timeline_deaths,",
+      "stats.assists AS timeline_assists, stats.player_damage AS timeline_player_damage,",
+      "death_details.game_time_s AS death_times_s,",
+      "death_details.death_duration_s AS death_durations_s,",
+      "death_details.time_to_kill_s AS death_ttk_s,",
+      "death_details.killer_player_slot AS death_killer_slots,",
+      "objectives.destroyed_time_s AS objective_times_s,",
+      "arrayMap(x -> toInt8(x), objectives.team_objective) AS objective_types,",
+      "arrayMap(x -> toInt8(x), objectives.team) AS objective_teams,",
+      "mid_boss.destroyed_time_s AS mid_boss_times_s,",
+      "arrayMap(x -> toInt8(x), mid_boss.team_killed) AS mid_boss_killed_teams,",
+      "arrayMap(x -> toInt8(x), mid_boss.team_claimed) AS mid_boss_claimed_teams,",
       "items.item_id AS build_item_ids, items.game_time_s AS build_times_s,",
       "items.sold_time_s AS build_sold_times_s, items.upgrade_id AS build_upgrade_ids,",
       "toInt8(player_match_outcome) AS player_match_outcome,",
@@ -257,6 +343,12 @@ export function buildMatchPlayersUrl(apiBase, matchIds) {
       "arrayMax(stats.damage_mitigated) AS damage_mitigated,",
       "max_boss_damage AS boss_damage, max_creep_damage AS creep_damage,",
       "max_shots_hit AS shots_hit, max_shots_missed AS shots_missed,",
+      "assigned_lane, mvp_rank,",
+      "stats.time_stamp_s AS timeline_times_s, stats.net_worth AS timeline_net_worth,",
+      "death_details.game_time_s AS death_times_s,",
+      "death_details.death_duration_s AS death_durations_s,",
+      "death_details.time_to_kill_s AS death_ttk_s,",
+      "death_details.killer_player_slot AS death_killer_slots,",
       "items.item_id AS build_item_ids, items.game_time_s AS build_times_s,",
       "items.sold_time_s AS build_sold_times_s, items.upgrade_id AS build_upgrade_ids",
       "FROM match_player FINAL",
@@ -464,6 +556,25 @@ export function buildRankContext(rankSnapshot, badgeDistribution, matches) {
   };
 }
 
+export function buildTeamEconomy(players) {
+  const timelinePlayers = players.filter((player) => player.timeline?.times?.length);
+  if (!timelinePlayers.length) return null;
+  const reference = [...timelinePlayers]
+    .sort((a, b) => b.timeline.times.length - a.timeline.times.length)[0].timeline.times;
+  const times = [...new Set(reference.map((time) => asNumber(time)).filter((time) => time > 0))]
+    .sort((a, b) => a - b);
+  const valueAt = (timeline, time) => {
+    return timelineValueAt(timeline, time);
+  };
+  const team0 = times.map((time) => timelinePlayers
+    .filter((player) => player.team === 0)
+    .reduce((sum, player) => sum + valueAt(player.timeline, time), 0));
+  const team1 = times.map((time) => timelinePlayers
+    .filter((player) => player.team === 1)
+    .reduce((sum, player) => sum + valueAt(player.timeline, time), 0));
+  return team0.some(Boolean) && team1.some(Boolean) ? { times, team0, team1 } : null;
+}
+
 export function buildDashboardData({
   steamId64,
   profile,
@@ -489,6 +600,7 @@ export function buildDashboardData({
   for (const player of matchPlayers) {
     const matchId = String(player.match_id);
     const roster = playersByMatch.get(matchId) ?? [];
+    const timeline = normalizeTimeline(player);
     roster.push({
       accountId: asNumber(player.account_id),
       heroId: asNumber(player.hero_id),
@@ -507,13 +619,23 @@ export function buildDashboardData({
       creepDamage: asNumber(player.creep_damage),
       shotsHit: asNumber(player.shots_hit),
       shotsMissed: asNumber(player.shots_missed),
+      assignedLane: asNumber(player.assigned_lane, 0),
+      mvpRank: player.mvp_rank == null ? null : asNumber(player.mvp_rank),
+      netWorthAt12: timelineValueAt(timeline, 12 * 60),
+      timeline,
+      deathDetails: normalizeDeathDetails(player),
       build: normalizeBuild(player),
       isSelf: asNumber(player.account_id) === accountId,
     });
     playersByMatch.set(matchId, roster);
   }
   for (const match of matches) {
-    match.players = playersByMatch.get(match.id) ?? [];
+    const roster = playersByMatch.get(match.id) ?? [];
+    match.teamEconomy = buildTeamEconomy(roster);
+    match.players = roster.map((player) => {
+      const { timeline, ...publishedPlayer } = player;
+      return publishedPlayer;
+    });
   }
 
   const usedHeroIds = new Set([
@@ -685,7 +807,19 @@ function matchWithoutRoster(match) {
 }
 
 function compactMatch(match, historyPage) {
-  const { build, players, ...summaryMatch } = match;
+  const {
+    build,
+    players,
+    timeline,
+    deathDetails,
+    objectives,
+    midBoss,
+    teamEconomy,
+    assignedLane,
+    mvpRank,
+    averageBadges,
+    ...summaryMatch
+  } = match;
   return { ...summaryMatch, historyPage };
 }
 

@@ -9,6 +9,7 @@ import {
   buildPublishedDataFiles,
   buildProcessedMatchesUrl,
   buildRankContext,
+  buildTeamEconomy,
   mergeMatchSources,
   parseSteamProfileReference,
   steamId64ToAccountId,
@@ -56,6 +57,26 @@ test("the complete raw match history is normalized", () => {
     build_times_s: [120, 360],
     build_sold_times_s: [0, 1_400],
     build_upgrade_ids: [1, 2],
+    assigned_lane: 2,
+    mvp_rank: 3,
+    average_badge_team0: 74,
+    average_badge_team1: 73,
+    timeline_times_s: [180, 360],
+    timeline_net_worth: [2_000, 4_500],
+    timeline_kills: [0, 2],
+    timeline_deaths: [0, 1],
+    timeline_assists: [1, 3],
+    timeline_player_damage: [500, 2_500],
+    death_times_s: [350],
+    death_durations_s: [22],
+    death_ttk_s: [3.5],
+    death_killer_slots: [7],
+    objective_times_s: [300],
+    objective_types: [1],
+    objective_teams: [0],
+    mid_boss_times_s: [1_200],
+    mid_boss_killed_teams: [0],
+    mid_boss_claimed_teams: [1],
     ranked_display_badge: index % 3 === 0 ? 74 : null,
     ranked_delta: index % 3 === 0 ? 12 : null,
   }));
@@ -74,11 +95,13 @@ test("the complete raw match history is normalized", () => {
       {
         match_id: 9_000, account_id: 1, hero_id: 1, team: 0, kills: 10, deaths: 5, assists: 8, net_worth: 45_000,
         player_damage: 52_000, player_healing: 4_500, build_item_ids: [100], build_times_s: [120],
+        assigned_lane: 2, timeline_times_s: [180, 360], timeline_net_worth: [2_000, 4_500],
       },
       {
         match_id: 9_000, account_id: 2, hero_id: 2, team: 1, kills: 7, deaths: 6, assists: 4, net_worth: 40_000,
         player_damage: 39_000, player_healing: 7_500, last_hits: 180, denies: 3,
         build_item_ids: [300], build_times_s: [90], build_upgrade_ids: [123],
+        assigned_lane: 2, timeline_times_s: [180, 360], timeline_net_worth: [1_800, 4_000],
       },
     ],
     heroAssets: [
@@ -117,6 +140,14 @@ test("the complete raw match history is normalized", () => {
   assert.equal(result.matches[0].players[0].isSelf, true);
   assert.equal(result.matches[0].players[1].playerHealing, 7_500);
   assert.equal(result.matches[0].players[1].build[0].itemId, 300);
+  assert.equal(result.matches[0].assignedLane, 2);
+  assert.equal(result.matches[0].timeline.netWorth[1], 4_500);
+  assert.equal(result.matches[0].deathDetails[0].timeToKillSeconds, 3.5);
+  assert.equal(result.matches[0].objectives[0].type, 1);
+  assert.equal(result.matches[0].midBoss[0].claimedByTeam, 1);
+  assert.deepEqual(result.matches[0].teamEconomy.team0, [2_000, 4_500]);
+  assert.deepEqual(result.matches[0].teamEconomy.team1, [1_800, 4_000]);
+  assert.equal(result.matches[0].players[0].timeline, undefined);
   assert.equal(result.heroes["1"].name, "Hero One");
   assert.equal(result.buildAssets["100"].name, "Test Item");
   assert.equal(result.buildAssets["300"].name, "Roster Ability");
@@ -130,18 +161,22 @@ test("the complete raw match history is normalized", () => {
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
 
   const published = buildPublishedDataFiles(result);
-  assert.equal(published.dashboard.schemaVersion, 4);
+  assert.equal(published.dashboard.schemaVersion, 5);
   assert.equal(published.dashboard.matches.length, 105);
   assert.equal(published.dashboard.matches[0].historyPage, 1);
   assert.equal(published.dashboard.matches[104].historyPage, 2);
   assert.equal("build" in published.dashboard.matches[0], false);
   assert.equal("players" in published.dashboard.matches[0], false);
+  assert.equal("timeline" in published.dashboard.matches[0], false);
+  assert.equal("teamEconomy" in published.dashboard.matches[0], false);
+  assert.equal("assignedLane" in published.dashboard.matches[0], false);
   assert.equal(published.recentMatches.matches.length, 12);
   assert.equal(published.recentMatches.matches[0].players.length, 2);
   assert.equal(published.historyPages.length, 2);
   assert.equal(published.historyPages[0].data.matches.length, 100);
   assert.equal(published.historyPages[1].data.matches.length, 5);
   assert.equal(published.historyPages[0].data.matches[0].build.length, 2);
+  assert.equal(published.historyPages[0].data.matches[0].timeline.times.length, 2);
   assert.equal("players" in published.historyPages[0].data.matches[0], false);
   assert.equal(published.historyIndex.totalMatches, 105);
   assert.ok(JSON.stringify(published.dashboard).length < JSON.stringify(result).length);
@@ -226,6 +261,9 @@ test("processed match query is scoped without an analysis cap", () => {
   assert.match(query, /player_match_outcome/);
   assert.match(query, /max_player_damage AS player_damage/);
   assert.match(query, /items\.item_id AS build_item_ids/);
+  assert.match(query, /stats\.time_stamp_s AS timeline_times_s/);
+  assert.match(query, /death_details\.time_to_kill_s AS death_ttk_s/);
+  assert.match(query, /objectives\.team_objective/);
 });
 
 test("team rosters are limited to the visible match details", () => {
@@ -237,7 +275,21 @@ test("team rosters are limited to the visible match details", () => {
   assert.match(query, /net_worth/);
   assert.match(query, /max_player_damage AS player_damage/);
   assert.match(query, /items\.item_id AS build_item_ids/);
+  assert.match(query, /stats\.net_worth AS timeline_net_worth/);
+  assert.match(query, /assigned_lane/);
   assert.doesNotMatch(query, /undefined|NaN/);
+});
+
+test("team economy aggregates aligned player timelines without publishing raw roster curves", () => {
+  const economy = buildTeamEconomy([
+    { team: 0, timeline: { times: [180, 360, 540], netWorth: [2_000, 4_000, 6_000] } },
+    { team: 0, timeline: { times: [180, 540], netWorth: [1_500, 5_500] } },
+    { team: 1, timeline: { times: [180, 360, 540], netWorth: [1_800, 3_700, 5_800] } },
+  ]);
+
+  assert.deepEqual(economy.times, [180, 360, 540]);
+  assert.deepEqual(economy.team0, [3_500, 5_500, 11_500]);
+  assert.deepEqual(economy.team1, [1_800, 3_700, 5_800]);
 });
 
 test("hero matchup query covers the complete personal history", () => {

@@ -36,6 +36,11 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /Globaler Durchschnitt/);
   assert.doesNotMatch(script, /Du gegen den API-Benchmark/);
   assert.match(script, /function openMatchDetail/);
+  assert.match(script, /function buildDeepMatchReview/);
+  assert.match(script, /function drawReviewChart/);
+  assert.match(script, /Deep Match Review/);
+  assert.match(script, /Review-Hinweise/);
+  assert.match(script, /Schlüsselereignisse/);
   assert.match(script, /function openMatchArchive/);
   assert.match(script, /function openCoach/);
   assert.match(script, /function openEnemyAnalysis/);
@@ -50,6 +55,9 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /function buildSessions/);
   assert.match(styles, /\.detail-open main/);
   assert.match(styles, /content-visibility: auto/);
+  assert.match(styles, /\.deep-review/);
+  assert.match(styles, /\.review-chart/);
+  assert.match(styles, /\.review-insight-grid/);
   assert.doesNotMatch(styles, /backdrop-filter/);
   assert.doesNotMatch(`${html}\n${script}`, /STEAM_API_KEY\s*=|NEXT_PUBLIC_/);
 });

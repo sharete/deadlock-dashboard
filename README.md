@@ -32,6 +32,8 @@ tausend Matches bleibt die initial geladene Datenmenge begrenzt.
 - persönlicher Build- und Ability-Coach auf Basis der eigenen Matchhistorie
 - Gegner-Analyse pro eigenem Hero und über den gesamten Hero Pool
 - Rank-Kontext mit persönlichem Peak, Kurztrend und 30-Tage-Rangverteilung
+- Deep Match Review mit Teamvergleich, Lane-Kontext, Economy-Kurve,
+  Schlüsselereignissen und datenbasierten Review-Hinweisen
 
 Coach- und Matchup-Werte zeigen Korrelationen aus der vorhandenen Stichprobe. Sie
 werden bewusst nicht als garantierte Ursache oder allgemeingültige Meta-Empfehlung

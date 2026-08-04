@@ -3,6 +3,7 @@ const state = {
   heroSort: "matches",
   recentMatches: [],
   historyPages: new Map(),
+  reviewObserver: null,
 };
 
 const HERO_SAMPLE_MIN = 3;
@@ -269,6 +270,8 @@ function renderForm(matches, heroGroups) {
 }
 
 function openDetail({ eyebrow, title, subtitle, body }) {
+  state.reviewObserver?.disconnect();
+  state.reviewObserver = null;
   text("detail-eyebrow", eyebrow);
   text("detail-title", title);
   text("detail-subtitle", subtitle);
@@ -279,6 +282,8 @@ function openDetail({ eyebrow, title, subtitle, body }) {
 }
 
 function closeDetail() {
+  state.reviewObserver?.disconnect();
+  state.reviewObserver = null;
   const dialog = byId("detail-dialog");
   if (dialog.open) dialog.close();
   document.documentElement.classList.remove("detail-open");
@@ -1027,6 +1032,407 @@ function buildTimeline(match, type, title, description) {
   return section;
 }
 
+function teamSummary(players) {
+  return players.reduce((summary, player) => ({
+    kills: summary.kills + player.kills,
+    deaths: summary.deaths + player.deaths,
+    assists: summary.assists + player.assists,
+    netWorth: summary.netWorth + player.netWorth,
+    playerDamage: summary.playerDamage + player.playerDamage,
+    healing: summary.healing + player.playerHealing,
+    bossDamage: summary.bossDamage + player.bossDamage,
+  }), { kills: 0, deaths: 0, assists: 0, netWorth: 0, playerDamage: 0, healing: 0, bossDamage: 0 });
+}
+
+function rankAmong(players, player, getter) {
+  if (!players.length || !player) return null;
+  return [...players].sort((a, b) => getter(b) - getter(a)).findIndex((candidate) => candidate === player) + 1;
+}
+
+function timelineValueAt(timeline, field, atSeconds) {
+  if (!timeline?.times?.length || !timeline?.[field]?.length) return 0;
+  let value = 0;
+  for (let index = 0; index < timeline.times.length; index += 1) {
+    if (timeline.times[index] > atSeconds) break;
+    value = Number(timeline[field][index] ?? value);
+  }
+  return value;
+}
+
+function economyModel(match) {
+  if (match.teamEconomy?.times?.length) {
+    const own = match.team === 0 ? match.teamEconomy.team0 : match.teamEconomy.team1;
+    const enemy = match.team === 0 ? match.teamEconomy.team1 : match.teamEconomy.team0;
+    return {
+      times: match.teamEconomy.times,
+      series: [
+        { label: "Dein Team", color: "#d7ff64", values: own },
+        { label: "Gegnerteam", color: "#ff7448", values: enemy },
+      ],
+      differences: own.map((value, index) => value - (enemy[index] ?? 0)),
+    };
+  }
+  if (match.timeline?.times?.length && match.timeline.netWorth?.length) {
+    return {
+      times: match.timeline.times,
+      series: [{ label: "Dein Net Worth", color: "#d7ff64", values: match.timeline.netWorth }],
+      differences: null,
+    };
+  }
+  return null;
+}
+
+function compactAxisValue(value) {
+  if (Math.abs(value) >= 100_000) return `${Math.round(value / 1_000)}k`;
+  if (Math.abs(value) >= 10_000) return `${(value / 1_000).toFixed(0)}k`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return numberFormat.format(Math.round(value));
+}
+
+function drawReviewChart(canvas, model) {
+  if (!canvas?.isConnected || !model?.times?.length) return;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+  canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const width = rect.width;
+  const height = rect.height;
+  const padding = { top: 16, right: 16, bottom: 30, left: 46 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const values = model.series.flatMap((series) => series.values);
+  const minValue = Math.max(0, Math.min(...values) * 0.88);
+  const maxValue = Math.max(...values) * 1.06;
+  const range = Math.max(1, maxValue - minValue);
+  const minTime = Math.min(...model.times);
+  const maxTime = Math.max(...model.times);
+  const timeRange = Math.max(1, maxTime - minTime);
+  const x = (time) => padding.left + ((time - minTime) / timeRange) * plotWidth;
+  const y = (value) => padding.top + ((maxValue - value) / range) * plotHeight;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.font = "9px ui-monospace, monospace";
+  ctx.fillStyle = "#65706b";
+  ctx.strokeStyle = "rgba(226,237,231,.085)";
+  ctx.lineWidth = 1;
+  for (let index = 0; index <= 4; index += 1) {
+    const lineY = padding.top + (plotHeight * index) / 4;
+    const value = maxValue - (range * index) / 4;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, lineY);
+    ctx.lineTo(width - padding.right, lineY);
+    ctx.stroke();
+    ctx.fillText(compactAxisValue(value), 0, lineY + 3);
+  }
+
+  for (const series of model.series) {
+    ctx.beginPath();
+    model.times.forEach((time, index) => {
+      const px = x(time);
+      const py = y(series.values[index] ?? 0);
+      if (index === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.strokeStyle = series.color;
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "#65706b";
+  ctx.textAlign = "center";
+  for (const time of [minTime, minTime + timeRange / 2, maxTime]) {
+    ctx.fillText(`${Math.round(time / 60)} min`, x(time), height - 8);
+  }
+  ctx.textAlign = "start";
+}
+
+function teamComparisonBlock(match, ownTeam, enemyTeam) {
+  if (!ownTeam.length || !enemyTeam.length) return null;
+  const own = teamSummary(ownTeam);
+  const enemy = teamSummary(enemyTeam);
+  const block = create("div", "review-block");
+  const heading = create("div", "review-subheading");
+  heading.append(create("h4", "", "Teamvergleich"), create("p", "", "Finale Teamwerte aus dem Match."));
+  block.append(heading);
+  const rows = create("div", "team-comparison");
+  for (const metric of [
+    { label: "Kills", own: own.kills, enemy: enemy.kills },
+    { label: "Net Worth", own: own.netWorth, enemy: enemy.netWorth },
+    { label: "Player Damage", own: own.playerDamage, enemy: enemy.playerDamage },
+    { label: "Healing", own: own.healing, enemy: enemy.healing },
+    { label: "Boss Damage", own: own.bossDamage, enemy: enemy.bossDamage },
+  ]) {
+    const maximum = Math.max(1, metric.own, metric.enemy);
+    const row = create("div", "team-comparison-row");
+    row.append(create("strong", metric.own >= metric.enemy ? "positive" : "", numberFormat.format(metric.own)));
+    const visual = create("div", "team-comparison-visual");
+    const label = create("span", "", metric.label);
+    const bars = create("span", "team-comparison-bars");
+    const ownBar = create("span", "is-own");
+    ownBar.style.width = `${(metric.own / maximum) * 100}%`;
+    const enemyBar = create("span", "is-enemy");
+    enemyBar.style.width = `${(metric.enemy / maximum) * 100}%`;
+    bars.append(ownBar, enemyBar);
+    visual.append(label, bars);
+    row.append(visual, create("strong", metric.enemy > metric.own ? "negative" : "", numberFormat.format(metric.enemy)));
+    rows.append(row);
+  }
+  block.append(rows);
+  return block;
+}
+
+function laneReviewBlock(match, ownTeam, enemyTeam) {
+  if (!match.assignedLane || !ownTeam.length || !enemyTeam.length) return null;
+  const ownLane = ownTeam.filter((player) => player.assignedLane === match.assignedLane);
+  const enemyLane = enemyTeam.filter((player) => player.assignedLane === match.assignedLane);
+  if (!ownLane.length || !enemyLane.length) return null;
+  const ownAt12 = ownLane.reduce((sum, player) => sum + (player.netWorthAt12 || 0), 0);
+  const enemyAt12 = enemyLane.reduce((sum, player) => sum + (player.netWorthAt12 || 0), 0);
+  if (!ownAt12 && !enemyAt12) return null;
+  const ownFinal = ownLane.reduce((sum, player) => sum + player.netWorth, 0);
+  const enemyFinal = enemyLane.reduce((sum, player) => sum + player.netWorth, 0);
+  const block = create("div", "review-block lane-review");
+  const heading = create("div", "review-subheading");
+  heading.append(
+    create("h4", "", `Lane ${match.assignedLane} Review`),
+    create("p", "", `${ownLane.map((player) => heroFor(player.heroId).name).join(" + ")} gegen ${enemyLane.map((player) => heroFor(player.heroId).name).join(" + ")}`),
+  );
+  block.append(heading, metricGrid([
+    { label: "Net Worth · 12 Min.", value: numberFormat.format(ownAt12), note: `${signedDifference(ownAt12, enemyAt12)} zur Gegner-Lane`, tone: ownAt12 >= enemyAt12 ? "positive" : "negative" },
+    { label: "Gegner · 12 Min.", value: numberFormat.format(enemyAt12) },
+    { label: "Lane-Gruppe · Ende", value: numberFormat.format(ownFinal), note: `${signedDifference(ownFinal, enemyFinal)} final`, tone: ownFinal >= enemyFinal ? "positive" : "negative" },
+  ], "lane-review-metrics"));
+  return { block, ownAt12, enemyAt12 };
+}
+
+function objectiveLabel(type) {
+  if (type === 0) return "Patron zerstört";
+  if (type >= 1 && type <= 4) return `Guardian · Lane ${type}`;
+  if (type >= 5 && type <= 8) return `Walker · Lane ${type - 4}`;
+  if (type === 9) return "Patron-Phase erreicht";
+  if (type === 10 || type === 11) return "Schildgenerator zerstört";
+  if (type >= 12 && type <= 15) return `Base Guardian · Lane ${type - 11}`;
+  return "Objective zerstört";
+}
+
+function matchKeyMoments(match, model) {
+  const moments = [];
+  for (const event of match.objectives ?? []) {
+    moments.push({
+      atSeconds: event.atSeconds,
+      title: objectiveLabel(event.type),
+      detail: event.team === match.team ? "Dein Team" : "Gegnerteam",
+      tone: event.team === match.team ? "positive" : "negative",
+      priority: event.type === 0 || event.type >= 9 ? 5 : event.type >= 5 ? 3 : 1,
+    });
+  }
+  for (const event of match.midBoss ?? []) {
+    const claimedOwn = event.claimedByTeam === match.team;
+    const killedOwn = event.killedByTeam === match.team;
+    moments.push({
+      atSeconds: event.atSeconds,
+      title: "Mid Boss",
+      detail: `${killedOwn ? "von deinem Team besiegt" : "vom Gegner besiegt"} · ${claimedOwn ? "Claim gesichert" : "Claim beim Gegner"}`,
+      tone: claimedOwn ? "positive" : "negative",
+      priority: 5,
+    });
+  }
+  for (const death of match.deathDetails ?? []) {
+    moments.push({
+      atSeconds: death.atSeconds,
+      title: "Death",
+      detail: `${Math.round(death.durationSeconds)} Sek. Ausfall${death.timeToKillSeconds == null ? "" : ` · ${decimalFormat.format(death.timeToKillSeconds)} Sek. TTK`}`,
+      tone: "negative",
+      priority: death.atSeconds >= 25 * 60 ? 4 : 2,
+    });
+  }
+  if (match.timeline?.times?.length) {
+    let previousKills = 0;
+    match.timeline.times.forEach((time, index) => {
+      const kills = match.timeline.kills?.[index] ?? previousKills;
+      const difference = kills - previousKills;
+      if (difference > 0) moments.push({
+        atSeconds: time,
+        title: difference > 1 ? `${difference} Kills im Zeitfenster` : "Kill erzielt",
+        detail: `${kills} Kills bis Minute ${Math.round(time / 60)}`,
+        tone: "positive",
+        priority: difference > 1 ? 4 : 1,
+      });
+      previousKills = kills;
+    });
+  }
+  for (const event of (match.build ?? [])
+    .map((buildEvent) => ({ ...buildEvent, asset: buildAssetFor(buildEvent.itemId) }))
+    .filter((buildEvent) => buildEvent.asset?.type === "upgrade" && buildEvent.asset?.tier >= 3)
+    .slice(0, 4)) {
+    moments.push({
+      atSeconds: event.atSeconds,
+      title: event.asset.name,
+      detail: `Tier-${event.asset.tier}-Power-Spike`,
+      tone: "neutral",
+      priority: 2,
+    });
+  }
+  if (model?.differences?.length >= 2) {
+    let swing = { amount: 0, index: 0 };
+    for (let index = 1; index < model.differences.length; index += 1) {
+      const amount = model.differences[index] - model.differences[index - 1];
+      if (Math.abs(amount) > Math.abs(swing.amount)) swing = { amount, index };
+    }
+    if (Math.abs(swing.amount) >= 3_000) moments.push({
+      atSeconds: model.times[swing.index],
+      title: swing.amount > 0 ? "Größter Economy-Gewinn" : "Größter Economy-Verlust",
+      detail: `${signedDifference(swing.amount, 0)} Net Worth im Messintervall`,
+      tone: swing.amount > 0 ? "positive" : "negative",
+      priority: 5,
+    });
+  }
+  return moments
+    .sort((a, b) => b.priority - a.priority || a.atSeconds - b.atSeconds)
+    .slice(0, 18)
+    .sort((a, b) => a.atSeconds - b.atSeconds);
+}
+
+function reviewInsights(match, context) {
+  const insights = [];
+  const { participation, economyRank, damageRank, lane, model } = context;
+  if (model?.differences?.length) {
+    const maxLead = Math.max(...model.differences);
+    const minLead = Math.min(...model.differences);
+    if (match.result === "loss" && maxLead >= 4_000) insights.push({
+      title: "Führung nicht geschlossen",
+      body: `Dein Team lag zwischenzeitlich ${numberFormat.format(Math.round(maxLead))} Net Worth vorn. Prüfe im Verlauf den Umschwung nach diesem Peak.`,
+      tone: "warning",
+    });
+    if (match.result === "win" && minLead <= -4_000) insights.push({
+      title: "Comeback-Sieg",
+      body: `Das Team drehte einen Rückstand von ${numberFormat.format(Math.round(Math.abs(minLead)))} Net Worth. Die Phase vor dem größten Swing ist besonders review-würdig.`,
+      tone: "positive",
+    });
+  }
+  const deaths = match.deathDetails ?? [];
+  const quickDeaths = deaths.filter((death) => death.timeToKillSeconds != null && death.timeToKillSeconds <= 4).length;
+  const lateDeaths = deaths.filter((death) => death.atSeconds >= 25 * 60).length;
+  if (quickDeaths >= 2) insights.push({
+    title: "Burst-Deaths prüfen",
+    body: `${quickDeaths} Deaths passierten in höchstens vier Sekunden. Positionierung, Defensive-Aktivierung und Gegner-Cooldowns sind hier die ersten Review-Punkte.`,
+    tone: "warning",
+  });
+  if (lateDeaths >= 2) insights.push({
+    title: "Späte Ausfallzeiten",
+    body: `${lateDeaths} Deaths lagen nach Minute 25. In dieser Phase sind lange Respawn-Zeiten besonders teuer.`,
+    tone: "warning",
+  });
+  if (participation != null && participation < 40) insights.push({
+    title: "Niedrige Killbeteiligung",
+    body: `${percentFormat.format(participation)}% Beteiligung an den Team-Kills. Prüfe Rotationen und ob Fights zu spät erreicht wurden.`,
+    tone: "neutral",
+  });
+  if (economyRank != null && damageRank != null && economyRank <= 3 && damageRank >= 7) insights.push({
+    title: "Economy nicht vollständig umgesetzt",
+    body: `Economy-Rang ${economyRank}, aber Damage-Rang ${damageRank}. Prüfe die Fights nach deinen großen Item-Timings.`,
+    tone: "warning",
+  });
+  if (lane && Math.abs(lane.ownAt12 - lane.enemyAt12) >= 1_500) insights.push({
+    title: lane.ownAt12 >= lane.enemyAt12 ? "Starke Lane-Economy" : "Lane-Economy im Rückstand",
+    body: `Nach zwölf Minuten lag deine Lane-Gruppe ${numberFormat.format(Math.abs(lane.ownAt12 - lane.enemyAt12))} Net Worth ${lane.ownAt12 >= lane.enemyAt12 ? "vorn" : "hinten"}.`,
+    tone: lane.ownAt12 >= lane.enemyAt12 ? "positive" : "warning",
+  });
+  if (!insights.length) insights.push({
+    title: "Stabiles Matchprofil",
+    body: "Kein einzelnes Warnsignal dominiert. Nutze Economy-Kurve und Schlüsselereignisse für die manuelle Detailprüfung.",
+    tone: "neutral",
+  });
+  return insights.slice(0, 4);
+}
+
+function buildDeepMatchReview(match) {
+  const section = detailSection(
+    "Deep Match Review",
+    "Zeitverlauf, Teamkontext und konkrete Review-Punkte aus den verfügbaren Matchdaten.",
+  );
+  section.classList.add("deep-review");
+  const players = match.players ?? [];
+  const self = players.find((player) => player.isSelf) ?? null;
+  const ownTeam = players.filter((player) => player.team === match.team);
+  const enemyTeam = players.filter((player) => player.team !== match.team);
+  const ownSummary = teamSummary(ownTeam);
+  const participation = ownSummary.kills ? ((match.kills + match.assists) / ownSummary.kills) * 100 : null;
+  const economyRank = rankAmong(players, self, (player) => player.netWorth);
+  const damageRank = rankAmong(players, self, (player) => player.playerDamage);
+  const deathDowntime = (match.deathDetails ?? []).reduce((sum, death) => sum + death.durationSeconds, 0);
+  section.append(metricGrid([
+    { label: "Killbeteiligung", value: participation == null ? "—" : `${percentFormat.format(Math.min(100, participation))}%`, note: participation == null ? "Teamdaten fehlen" : `${match.kills + match.assists} Beteiligungen` },
+    { label: "Economy-Rang", value: economyRank == null ? "—" : `${economyRank} / ${players.length}`, note: "Nach finalem Net Worth" },
+    { label: "Damage-Rang", value: damageRank == null ? "—" : `${damageRank} / ${players.length}`, note: "Im gesamten Match" },
+    { label: "Death-Ausfallzeit", value: deathDowntime ? formatDuration(deathDowntime) : "0:00", note: `${match.deathDetails?.length ?? match.deaths} erfasste Deaths` },
+  ], "review-impact-grid"));
+
+  const comparison = teamComparisonBlock(match, ownTeam, enemyTeam);
+  if (comparison) section.append(comparison);
+  const lane = laneReviewBlock(match, ownTeam, enemyTeam);
+  if (lane) section.append(lane.block);
+
+  const model = economyModel(match);
+  let chart = null;
+  if (model) {
+    const economy = create("div", "review-block economy-review");
+    const heading = create("div", "review-subheading");
+    heading.append(create("h4", "", "Economy-Verlauf"), create("p", "", model.series.length > 1 ? "Team-Net-Worth über den Matchverlauf." : "Dein persönlicher Net-Worth-Verlauf."));
+    const legend = create("div", "review-chart-legend");
+    for (const series of model.series) {
+      const item = create("span");
+      const dot = create("i");
+      dot.style.background = series.color;
+      item.append(dot, document.createTextNode(series.label));
+      legend.append(item);
+    }
+    chart = create("canvas", "review-chart");
+    chart.setAttribute("aria-label", "Economy-Verlauf dieses Matches");
+    economy.append(heading, legend, chart);
+    section.append(economy);
+  }
+
+  const insights = reviewInsights(match, { participation, economyRank, damageRank, lane, model });
+  const insightBlock = create("div", "review-block");
+  const insightHeading = create("div", "review-subheading");
+  insightHeading.append(create("h4", "", "Review-Hinweise"), create("p", "", "Datenbasierte Auffälligkeiten – als Ausgangspunkt für deine eigene Bewertung."));
+  const insightGrid = create("div", "review-insight-grid");
+  for (const insight of insights) {
+    const card = create("article", `review-insight is-${insight.tone}`);
+    card.append(create("strong", "", insight.title), create("p", "", insight.body));
+    insightGrid.append(card);
+  }
+  insightBlock.append(insightHeading, insightGrid);
+  section.append(insightBlock);
+
+  const moments = matchKeyMoments(match, model);
+  if (moments.length) {
+    const momentBlock = create("div", "review-block");
+    const heading = create("div", "review-subheading");
+    heading.append(create("h4", "", "Schlüsselereignisse"), create("p", "", "Priorisierte Objectives, Deaths, Power-Spikes und Economy-Swings."));
+    const timeline = create("div", "review-moments");
+    for (const moment of moments) {
+      const item = create("div", `review-moment is-${moment.tone}`);
+      item.append(create("time", "", formatDuration(moment.atSeconds)));
+      const copy = create("span");
+      copy.append(create("strong", "", moment.title), create("small", "", moment.detail));
+      item.append(copy);
+      timeline.append(item);
+    }
+    momentBlock.append(heading, timeline);
+    section.append(momentBlock);
+  } else if (!model && !players.length) {
+    section.append(create("p", "sample-notice", "Für dieses ältere Match liegen noch keine vollständigen Zeitreihen oder Teamdaten vor."));
+  }
+  return { section, chart, model };
+}
+
 function openMatchDetail(match) {
   const hero = heroFor(match.heroId);
   const overall = summarize(selectedMatches());
@@ -1040,6 +1446,9 @@ function openMatchDetail(match) {
     { label: "Souls / Min.", value: numberFormat.format(match.soulsPerMinute) },
     { label: "Net Worth", value: numberFormat.format(match.netWorth), note: formatDuration(match.durationSeconds) },
   ]));
+
+  const deepReview = buildDeepMatchReview(match);
+  body.append(deepReview.section);
 
   const performance = detailSection("Performance-Profil", "Detaillierte Werte aus den verarbeiteten Matchdaten.");
   performance.append(metricGrid([
@@ -1110,6 +1519,15 @@ function openMatchDetail(match) {
       : "Datum unbekannt",
     body,
   });
+  if (deepReview.chart && deepReview.model) {
+    requestAnimationFrame(() => {
+      drawReviewChart(deepReview.chart, deepReview.model);
+      if (typeof ResizeObserver === "function") {
+        state.reviewObserver = new ResizeObserver(() => drawReviewChart(deepReview.chart, deepReview.model));
+        state.reviewObserver.observe(deepReview.chart);
+      }
+    });
+  }
 }
 
 function renderMatches(matches) {
@@ -1328,6 +1746,8 @@ function showReady(data) {
 
   byId("detail-close").addEventListener("click", closeDetail);
   byId("detail-dialog").addEventListener("close", () => {
+    state.reviewObserver?.disconnect();
+    state.reviewObserver = null;
     document.documentElement.classList.remove("detail-open");
   });
   byId("detail-dialog").addEventListener("click", (event) => {
