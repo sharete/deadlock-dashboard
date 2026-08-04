@@ -1,4 +1,4 @@
-# Deadlock Personal Intelligence
+# Deadlock Personal Dashboard
 
 Persönliches Deadlock-Performance-Dashboard für Matches, Helden und
 Rangentwicklung. Die Website wird statisch und kostenlos über GitHub Pages

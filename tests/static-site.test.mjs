@@ -12,7 +12,11 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   ]);
 
   assert.match(html, /<html lang="de">/);
-  assert.match(html, /<title>Deadlock Personal Intelligence<\/title>/);
+  assert.match(html, /<title>Deadlock Personal Dashboard<\/title>/);
+  assert.match(html, /Dashboard made by/);
+  assert.match(html, /id="footer-author"/);
+  assert.doesNotMatch(html, /PRIVATE COMMAND CENTER|HERO PERFORMANCE|SESSION INTELLIGENCE|MATCH INTELLIGENCE/);
+  assert.doesNotMatch(html, /id="live-state"/);
   assert.doesNotMatch(html, /data-window=/);
   assert.match(html, /data-hero-sort="matches"/);
   assert.match(html, /data-hero-sort="winrate"/);

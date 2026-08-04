@@ -10,15 +10,15 @@
       content="Persönliches Deadlock-Performance-Dashboard für Matches, Helden und Rangentwicklung."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Deadlock Personal Intelligence" />
+    <meta property="og:title" content="Deadlock Personal Dashboard" />
     <meta property="og:description" content="Deine Matches. Dein Muster. Persönliche Deadlock-Performance auf einen Blick." />
     <meta property="og:url" content="https://sharete.github.io/deadlock-dashboard/" />
     <meta property="og:image" content="https://sharete.github.io/deadlock-dashboard/public/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Deadlock Personal Intelligence" />
+    <meta name="twitter:title" content="Deadlock Personal Dashboard" />
     <meta name="twitter:description" content="Deine Matches. Dein Muster. Persönliche Deadlock-Performance auf einen Blick." />
     <meta name="twitter:image" content="https://sharete.github.io/deadlock-dashboard/public/og.png" />
-    <title>Deadlock Personal Intelligence</title>
+    <title>Deadlock Personal Dashboard</title>
     <link rel="icon" href="./public/favicon.svg" />
     <link rel="stylesheet" href="./dashboard.css" />
     <script type="module" src="./dashboard.js"></script>
@@ -28,17 +28,13 @@
       <div class="ambient-grid" aria-hidden="true"></div>
 
       <header class="topbar">
-        <a class="brand" href="#top" aria-label="Deadlock Personal Intelligence Startseite">
+        <a class="brand" href="#top" aria-label="Deadlock Personal Dashboard Startseite">
           <span class="brand-mark" aria-hidden="true"><span></span></span>
           <span class="brand-copy">
             <strong>DEADLOCK</strong>
-            <small>PERSONAL INTELLIGENCE</small>
+            <small>PERSONAL DASHBOARD</small>
           </span>
         </a>
-        <div class="live-state" id="live-state">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span id="live-state-label">Daten werden geprüft</span>
-        </div>
       </header>
 
       <main id="top">
@@ -81,7 +77,6 @@
             <div class="profile-identity">
               <img id="profile-avatar" class="profile-avatar" alt="" width="112" height="112" />
               <div>
-                <p class="eyebrow">PRIVATE COMMAND CENTER</p>
                 <div class="profile-name-line">
                   <span id="country-flag" class="country-flag" aria-hidden="true"></span>
                   <h1 id="profile-name">Steam Player</h1>
@@ -169,7 +164,6 @@
           <section class="content-section" aria-labelledby="heroes-title">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">HERO PERFORMANCE</p>
                 <h2 id="heroes-title">Dein Hero Pool</h2>
               </div>
               <div class="hero-sort-panel">
@@ -191,7 +185,6 @@
           <section class="content-section" aria-labelledby="sessions-title">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">SESSION INTELLIGENCE</p>
                 <h2 id="sessions-title">Deine Spielsessions</h2>
               </div>
               <p>Die letzten sechs Sessions · Matches mit höchstens 90 Minuten Abstand werden zusammengefasst.</p>
@@ -202,7 +195,6 @@
           <section class="content-section" aria-labelledby="matches-title">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">MATCH INTELLIGENCE</p>
                 <h2 id="matches-title">Letzte Matches</h2>
               </div>
               <div class="match-heading-actions">
@@ -245,8 +237,12 @@
       </dialog>
 
       <footer>
-        <span>DEADLOCK PERSONAL INTELLIGENCE</span>
-        <span id="footer-update">Noch keine Live-Daten · Hosted on GitHub Pages</span>
+        <span>DEADLOCK PERSONAL DASHBOARD</span>
+        <span>
+          <span id="footer-update-time">Noch keine Live-Daten</span>
+          · Dashboard made by
+          <a id="footer-author" href="https://steamcommunity.com/id/sharete1989/" target="_blank" rel="noreferrer">sha</a>
+        </span>
       </footer>
     </div>
 

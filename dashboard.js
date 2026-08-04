@@ -1654,7 +1654,7 @@ function openMatchDetail(match) {
   }
 
   openDetail({
-    eyebrow: "MATCH INTELLIGENCE",
+    eyebrow: "DEEP MATCH REVIEW",
     title: `${hero.name} · #${match.id.slice(-7)}`,
     subtitle: match.startedAt
       ? new Intl.DateTimeFormat("de-DE", { dateStyle: "full", timeStyle: "short" }).format(new Date(match.startedAt))
@@ -1865,9 +1865,6 @@ function showReady(data) {
   state.data = data;
   byId("setup-view").hidden = true;
   byId("dashboard-view").hidden = false;
-  byId("live-state").classList.add("is-live");
-  text("live-state-label", "Automatische Updates aktiv");
-
   const profile = data.profile;
   text("profile-name", profile.name);
   const avatar = byId("profile-avatar");
@@ -1885,6 +1882,8 @@ function showReady(data) {
   const steamLink = byId("steam-profile-link");
   if (profile.profileUrl) steamLink.href = profile.profileUrl;
   else steamLink.hidden = true;
+  const footerAuthor = byId("footer-author");
+  if (profile.profileUrl) footerAuthor.href = profile.profileUrl;
 
   byId("detail-close").addEventListener("click", closeDetail);
   byId("detail-dialog").addEventListener("close", () => {
@@ -1911,8 +1910,8 @@ function showReady(data) {
   byId("progress-compare-button")?.addEventListener("click", openProgressComparison);
 
   text(
-    "footer-update",
-    `Letztes Update ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.generatedAt))} · Community-Daten`,
+    "footer-update-time",
+    `Letztes Update ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.generatedAt))}`,
   );
 
   renderDashboard();
@@ -1926,7 +1925,6 @@ function showReady(data) {
 function showSetup(message) {
   byId("setup-view").hidden = false;
   byId("dashboard-view").hidden = true;
-  text("live-state-label", message || "Steam-Profil fehlt");
 }
 
 async function init() {
