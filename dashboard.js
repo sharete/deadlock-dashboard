@@ -1,7 +1,10 @@
 const state = {
   data: null,
-  windowSize: 30,
+  windowSize: 100,
 };
+
+const ANALYSIS_WINDOW_KEY = "deadlock-analysis-window";
+const AVAILABLE_WINDOWS = [30, 60, 100];
 
 const numberFormat = new Intl.NumberFormat("de-DE");
 const decimalFormat = new Intl.NumberFormat("de-DE", {
@@ -19,6 +22,24 @@ function text(id, value) {
 
 function average(values) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function preferredWindow(defaultWindow) {
+  try {
+    const savedWindow = Number(localStorage.getItem(ANALYSIS_WINDOW_KEY));
+    if (AVAILABLE_WINDOWS.includes(savedWindow)) return savedWindow;
+  } catch {
+    // Storage can be disabled without affecting the dashboard.
+  }
+  return AVAILABLE_WINDOWS.includes(defaultWindow) ? defaultWindow : 100;
+}
+
+function rememberWindow(windowSize) {
+  try {
+    localStorage.setItem(ANALYSIS_WINDOW_KEY, String(windowSize));
+  } catch {
+    // The selected window still works for the current session.
+  }
 }
 
 function formatDuration(seconds) {
@@ -395,7 +416,7 @@ function renderDashboard() {
 
 function showReady(data) {
   state.data = data;
-  state.windowSize = [30, 60, 100].includes(data.defaultWindow) ? data.defaultWindow : 30;
+  state.windowSize = preferredWindow(data.defaultWindow);
   byId("setup-view").hidden = true;
   byId("dashboard-view").hidden = false;
   byId("live-state").classList.add("is-live");
@@ -428,6 +449,7 @@ function showReady(data) {
     button.setAttribute("aria-pressed", String(selected));
     button.addEventListener("click", () => {
       state.windowSize = Number(button.dataset.window);
+      rememberWindow(state.windowSize);
       for (const sibling of document.querySelectorAll("[data-window]")) {
         sibling.setAttribute("aria-pressed", String(sibling === button));
       }
