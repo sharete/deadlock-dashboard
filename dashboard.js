@@ -1,5 +1,6 @@
 const state = {
   data: null,
+  heroSort: "matches",
 };
 
 const numberFormat = new Intl.NumberFormat("de-DE");
@@ -113,6 +114,18 @@ function groupHeroes(matches) {
     .sort((a, b) => b.matches - a.matches || b.winrate - a.winrate);
 }
 
+function sortHeroGroups(groups, criterion) {
+  return [...groups].sort((a, b) => {
+    if (criterion === "winrate") {
+      return b.winrate - a.winrate || b.matches - a.matches || b.kda - a.kda;
+    }
+    if (criterion === "kda") {
+      return b.kda - a.kda || b.matches - a.matches || b.winrate - a.winrate;
+    }
+    return b.matches - a.matches || b.winrate - a.winrate || b.kda - a.kda;
+  });
+}
+
 function currentStreak(matches) {
   const decided = matches.filter((match) => match.result === "win" || match.result === "loss");
   const first = decided[0];
@@ -213,6 +226,18 @@ function renderHeroCards(groups) {
     body.append(kicker, name, stats);
     card.append(visual, body);
     grid.append(card);
+  }
+}
+
+function renderHeroSort() {
+  const descriptions = {
+    matches: "Nach den meisten Matches in der vollständigen Historie.",
+    winrate: "Nach der höchsten Winrate in der vollständigen Historie.",
+    kda: "Nach dem höchsten KDA in der vollständigen Historie.",
+  };
+  text("hero-sort-description", descriptions[state.heroSort]);
+  for (const button of document.querySelectorAll("[data-hero-sort]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.heroSort === state.heroSort));
   }
 }
 
@@ -383,7 +408,8 @@ function renderDashboard() {
   const heroGroups = groupHeroes(matches);
   renderMetrics(matches);
   renderForm(matches, heroGroups);
-  renderHeroCards(heroGroups);
+  renderHeroSort();
+  renderHeroCards(sortHeroGroups(heroGroups, state.heroSort));
   renderMatches(matches);
   drawRankChart(matches);
   text(
@@ -416,6 +442,15 @@ function showReady(data) {
   const steamLink = byId("steam-profile-link");
   if (profile.profileUrl) steamLink.href = profile.profileUrl;
   else steamLink.hidden = true;
+
+  for (const button of document.querySelectorAll("[data-hero-sort]")) {
+    button.addEventListener("click", () => {
+      state.heroSort = button.dataset.heroSort;
+      renderHeroSort();
+      renderHeroCards(sortHeroGroups(groupHeroes(selectedMatches()), state.heroSort));
+    });
+  }
+
   text(
     "footer-update",
     `Letztes Update ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.generatedAt))} · Community-Daten`,

@@ -218,6 +218,13 @@ button { color: inherit; }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; margin-bottom: 24px; }
 .section-heading h2 { margin: 0; font-size: clamp(34px, 4vw, 54px); letter-spacing: -0.055em; }
 .section-heading > p { max-width: 390px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; text-align: right; }
+.hero-sort-panel { display: grid; justify-items: end; gap: 12px; }
+.hero-sort-panel > p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: right; }
+.hero-sort { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,0.025); }
+.hero-sort button { min-height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-size: 10px; font-weight: 750; line-height: 1; cursor: pointer; transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
+.hero-sort button:hover { color: var(--text); }
+.hero-sort button:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
+.hero-sort button[aria-pressed="true"] { background: var(--acid); color: #11150c; box-shadow: 0 7px 20px rgba(215,255,100,0.12); }
 .hero-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .hero-card { position: relative; min-height: 250px; display: grid; grid-template-columns: 86px 1fr; gap: 20px; padding: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: 19px; background: linear-gradient(135deg, rgba(255,255,255,0.035), transparent 60%), var(--panel); }
 .hero-card::after { content: ""; position: absolute; inset: auto -30px -60px auto; width: 180px; height: 180px; border-radius: 50%; background: var(--hero-glow, rgba(215,255,100,0.08)); filter: blur(45px); opacity: 0.46; }
@@ -281,6 +288,10 @@ noscript { position: fixed; inset: auto 20px 20px; z-index: 4; padding: 12px 16p
   .metric-card { min-height: 145px; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .section-heading > p { text-align: left; }
+  .hero-sort-panel { width: 100%; justify-items: start; }
+  .hero-sort-panel > p { text-align: left; }
+  .hero-sort { width: 100%; }
+  .hero-sort button { flex: 1; padding-inline: 8px; }
   .hero-card { grid-template-columns: 76px 1fr; }
   .hero-card img { width: 76px; height: 106px; }
   footer { padding-block: 24px; align-items: flex-start; flex-direction: column; }

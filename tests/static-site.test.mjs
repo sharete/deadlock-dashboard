@@ -13,12 +13,16 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(html, /<html lang="de">/);
   assert.match(html, /<title>Deadlock Personal Intelligence<\/title>/);
   assert.doesNotMatch(html, /data-window=/);
+  assert.match(html, /data-hero-sort="matches"/);
+  assert.match(html, /data-hero-sort="winrate"/);
+  assert.match(html, /data-hero-sort="kda"/);
   assert.match(html, /id="rank-chart"/);
   assert.match(html, /\.\/dashboard\.js/);
   assert.match(script, /data\/dashboard\.json/);
   assert.match(script, /match\.isScored === false/);
   assert.match(script, /ungewertet/);
   assert.doesNotMatch(script, /deadlock-analysis-window|windowSize/);
+  assert.match(script, /function sortHeroGroups/);
   assert.doesNotMatch(`${html}\n${script}`, /STEAM_API_KEY\s*=|NEXT_PUBLIC_/);
 });
 

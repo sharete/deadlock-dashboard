@@ -166,7 +166,14 @@
                 <p class="eyebrow">HERO PERFORMANCE</p>
                 <h2 id="heroes-title">Dein Hero Pool</h2>
               </div>
-              <p>Sortiert nach Picks in der vollständigen Matchhistorie.</p>
+              <div class="hero-sort-panel">
+                <p id="hero-sort-description">Nach den meisten Matches in der vollständigen Historie.</p>
+                <div class="hero-sort" role="group" aria-label="Hero Pool sortieren">
+                  <button type="button" data-hero-sort="matches" aria-pressed="true">Meiste Matches</button>
+                  <button type="button" data-hero-sort="winrate" aria-pressed="false">Winrate</button>
+                  <button type="button" data-hero-sort="kda" aria-pressed="false">KDA</button>
+                </div>
+              </div>
             </div>
             <div class="hero-grid" id="hero-grid"></div>
           </section>
