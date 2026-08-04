@@ -173,8 +173,7 @@ function normalizeMatch(match) {
   };
 }
 
-export function buildProcessedMatchesUrl(apiBase, accountId, maxMatches = 100) {
-  const limit = boundedInteger(maxMatches, 100, 30, 100);
+export function buildProcessedMatchesUrl(apiBase, accountId) {
   const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/sql`);
   url.searchParams.set(
     "query",
@@ -198,7 +197,6 @@ export function buildProcessedMatchesUrl(apiBase, accountId, maxMatches = 100) {
       "FROM match_player FINAL",
       `WHERE account_id = ${boundedInteger(accountId, 0, 0, 4_294_967_295)}`,
       "ORDER BY start_time DESC",
-      `LIMIT ${limit}`,
     ].join(" "),
   );
   return url;
@@ -241,15 +239,12 @@ export function buildDashboardData({
   matchHistory,
   heroAssets,
   rankAssets,
-  maxMatches = 100,
-  defaultWindow = 30,
   timezone = "Europe/Berlin",
   generatedAt = new Date().toISOString(),
 }) {
   const accountId = steamId64ToAccountId(steamId64);
   const matches = [...matchHistory]
     .sort((a, b) => asNumber(b.start_time) - asNumber(a.start_time))
-    .slice(0, boundedInteger(maxMatches, 100, 30, 100))
     .map(normalizeMatch);
 
   const usedHeroIds = new Set(matches.map((match) => match.heroId));
@@ -295,7 +290,6 @@ export function buildDashboardData({
     state: "ready",
     generatedAt,
     timezone,
-    defaultWindow: boundedInteger(defaultWindow, 30, 30, 100),
     coverage: {
       availableMatches: matchHistory.length,
       publishedMatches: matches.length,
@@ -374,7 +368,7 @@ async function main() {
     ? { "X-API-Key": process.env.DEADLOCK_API_KEY }
     : {};
 
-  const processedMatchesUrl = buildProcessedMatchesUrl(apiBase, accountId, config.maxMatches);
+  const processedMatchesUrl = buildProcessedMatchesUrl(apiBase, accountId);
 
   const [profilePayload, gamesPayload, matchHistory, processedMatches, heroAssets, rankAssets] = await Promise.all([
     fetchJson(profileUrl, { label: "Steam-Profil" }),
@@ -419,8 +413,6 @@ async function main() {
     matchHistory: currentMatchHistory,
     heroAssets,
     rankAssets,
-    maxMatches: config.maxMatches,
-    defaultWindow: config.defaultWindow,
     timezone: config.timezone,
   });
 

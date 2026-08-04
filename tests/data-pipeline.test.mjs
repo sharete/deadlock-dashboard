@@ -22,7 +22,7 @@ test("Steam profile references are parsed without exposing credentials", () => {
   assert.throws(() => steamId64ToAccountId("123"), /17 Ziffern/);
 });
 
-test("raw match history is normalized and capped", () => {
+test("the complete raw match history is normalized", () => {
   const matches = Array.from({ length: 105 }, (_, index) => ({
     match_id: 9_000 - index,
     hero_id: index % 2 ? 2 : 1,
@@ -58,14 +58,13 @@ test("raw match history is normalized and capped", () => {
       { id: 2, name: "Hero Two", images: { icon_hero_card_webp: "https://example.com/two.webp" } },
     ],
     rankAssets: [{ tier: 7, name: "Oracle", color: "#abcdef", images: {} }],
-    maxMatches: 100,
     generatedAt: "2026-08-04T12:00:00.000Z",
   });
 
   assert.equal(result.state, "ready");
   assert.equal(result.profile.accountId, 1);
   assert.equal(result.profile.deadlockMinutes, 600);
-  assert.equal(result.matches.length, 100);
+  assert.equal(result.matches.length, 105);
   assert.equal(result.matches[0].result, "win");
   assert.equal(result.matches[0].soulsPerMinute, 1_500);
   assert.equal(result.heroes["1"].name, "Hero One");
@@ -98,13 +97,13 @@ test("an unscored match still uses the actual winning team", () => {
   assert.equal(result.matches[0].isScored, false);
 });
 
-test("processed match query is scoped and capped", () => {
-  const url = buildProcessedMatchesUrl("https://api.deadlock-api.com/", 64_862, 500);
+test("processed match query is scoped without an analysis cap", () => {
+  const url = buildProcessedMatchesUrl("https://api.deadlock-api.com/", 64_862);
   const query = url.searchParams.get("query");
 
   assert.equal(url.origin, "https://api.deadlock-api.com");
   assert.match(query, /account_id = 64862/);
-  assert.match(query, /LIMIT 100/);
+  assert.doesNotMatch(query, /LIMIT\s+\d+/);
   assert.match(query, /player_match_outcome/);
 });
 

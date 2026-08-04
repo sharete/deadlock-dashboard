@@ -182,9 +182,6 @@ button { color: inherit; }
 .profile-meta span { display: inline-flex; align-items: center; gap: 8px; }
 .profile-meta span:not(:last-child)::after { content: ""; width: 3px; height: 3px; margin-left: 12px; border-radius: 50%; background: rgba(215,255,100,0.55); }
 .profile-actions { display: flex; align-items: center; gap: 12px; }
-.window-switcher { display: flex; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,0.18); }
-.window-switcher button { min-width: 46px; height: 38px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 750; }
-.window-switcher button[aria-pressed="true"] { background: var(--acid); color: #10150f; box-shadow: 0 8px 26px rgba(215,255,100,0.16); }
 .external-link { min-height: 48px; display: inline-flex; align-items: center; padding: 0 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,0.025); font-size: 12px; font-weight: 700; }
 .external-link:hover { border-color: rgba(215,255,100,0.35); }
 
