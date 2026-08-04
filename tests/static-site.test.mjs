@@ -18,6 +18,10 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(html, /data-hero-sort="winrate"/);
   assert.match(html, /data-hero-sort="kda"/);
   assert.match(html, /id="rank-chart"/);
+  assert.match(html, /id="rank-details-button"/);
+  assert.match(html, /id="coach-button"/);
+  assert.match(html, /id="enemy-analysis-button"/);
+  assert.match(html, /id="match-archive-button"/);
   assert.match(html, /id="session-grid"/);
   assert.match(html, /id="detail-dialog"/);
   assert.match(html, /\.\/dashboard\.js/);
@@ -32,6 +36,11 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /Globaler Durchschnitt/);
   assert.doesNotMatch(script, /Du gegen den API-Benchmark/);
   assert.match(script, /function openMatchDetail/);
+  assert.match(script, /function openMatchArchive/);
+  assert.match(script, /function openCoach/);
+  assert.match(script, /function openEnemyAnalysis/);
+  assert.match(script, /function openRankContext/);
+  assert.match(script, /Zusammenhänge sind Hinweise, keine garantierte Ursache/);
   assert.match(script, /function loadHistoryPage/);
   assert.match(script, /dataFiles\.recentMatches/);
   assert.match(script, /historyPagePattern/);

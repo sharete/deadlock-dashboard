@@ -3,9 +3,12 @@ import test from "node:test";
 
 import {
   buildDashboardData,
+  buildHeroCoach,
+  buildHeroMatchupsUrl,
   buildMatchPlayersUrl,
   buildPublishedDataFiles,
   buildProcessedMatchesUrl,
+  buildRankContext,
   mergeMatchSources,
   parseSteamProfileReference,
   steamId64ToAccountId,
@@ -91,6 +94,14 @@ test("the complete raw match history is normalized", () => {
       { hero_id: 1, matches: 100, wins: 55, total_kills: 1_000, total_deaths: 500, total_assists: 750, total_net_worth: 4_000_000, total_player_damage: 5_000_000 },
     ],
     rankAssets: [{ tier: 7, name: "Oracle", color: "#abcdef", images: {} }],
+    rankSnapshot: { badge: 74, rank: 7, subrank: 4 },
+    badgeDistribution: [
+      { badge_level: 64, unique_players: 75 },
+      { badge_level: 74, unique_players: 25 },
+    ],
+    heroMatchups: [
+      { hero_id: 1, enemy_hero_id: 2, matches_played: 12, wins: 7 },
+    ],
     generatedAt: "2026-08-04T12:00:00.000Z",
   });
 
@@ -111,10 +122,15 @@ test("the complete raw match history is normalized", () => {
   assert.equal(result.buildAssets["300"].name, "Roster Ability");
   assert.equal(Math.round(result.heroBenchmarks["1"].winrate), 55);
   assert.equal(result.ranks["7"].name, "Oracle");
+  assert.equal(result.heroCoach["1"].matches, 53);
+  assert.equal(result.matchups[0].enemyHeroId, 2);
+  assert.equal(Math.round(result.matchups[0].winrate), 58);
+  assert.equal(result.rankContext.currentBadge, 74);
+  assert.equal(result.rankContext.percentile, 75);
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
 
   const published = buildPublishedDataFiles(result);
-  assert.equal(published.dashboard.schemaVersion, 3);
+  assert.equal(published.dashboard.schemaVersion, 4);
   assert.equal(published.dashboard.matches.length, 105);
   assert.equal(published.dashboard.matches[0].historyPage, 1);
   assert.equal(published.dashboard.matches[104].historyPage, 2);
@@ -222,6 +238,81 @@ test("team rosters are limited to the visible match details", () => {
   assert.match(query, /max_player_damage AS player_damage/);
   assert.match(query, /items\.item_id AS build_item_ids/);
   assert.doesNotMatch(query, /undefined|NaN/);
+});
+
+test("hero matchup query covers the complete personal history", () => {
+  const url = buildHeroMatchupsUrl("https://api.deadlock-api.com/", 64_862);
+  const query = url.searchParams.get("query");
+
+  assert.match(query, /match_player AS self FINAL/);
+  assert.match(query, /match_player AS enemy FINAL/);
+  assert.match(query, /self\.team != enemy\.team/);
+  assert.match(query, /self\.account_id = 64862/);
+  assert.match(query, /GROUP BY self\.hero_id, enemy\.hero_id/);
+  assert.doesNotMatch(query, /LIMIT\s+\d+/);
+});
+
+test("personal coach deduplicates items and groups ability start orders", () => {
+  const assets = {
+    "10": { id: 10, type: "upgrade" },
+    "20": { id: 20, type: "ability" },
+    "21": { id: 21, type: "ability" },
+  };
+  const matches = [
+    {
+      heroId: 1,
+      result: "win",
+      build: [
+        { itemId: 10, atSeconds: 100 },
+        { itemId: 10, atSeconds: 400 },
+        { itemId: 20, atSeconds: 60 },
+        { itemId: 21, atSeconds: 180 },
+      ],
+    },
+    {
+      heroId: 1,
+      result: "loss",
+      build: [
+        { itemId: 10, atSeconds: 200 },
+        { itemId: 20, atSeconds: 70 },
+        { itemId: 21, atSeconds: 200 },
+      ],
+    },
+  ];
+
+  const coach = buildHeroCoach(matches, assets)["1"];
+  assert.equal(coach.items[0].matches, 2);
+  assert.equal(coach.items[0].avgBuySeconds, 150);
+  assert.equal(coach.abilityOrders[0].matches, 2);
+  assert.deepEqual(coach.abilityOrders[0].abilityIds, [20, 21]);
+});
+
+test("rank context derives a transparent player percentile", () => {
+  const context = buildRankContext(
+    { badge: 74, rank: 7, subrank: 4 },
+    [
+      { badge_level: 64, unique_players: 60 },
+      { badge_level: 74, unique_players: 30 },
+      { badge_level: 84, unique_players: 10 },
+    ],
+    [
+      { rankBadge: 74 },
+      { rankBadge: 72 },
+    ],
+  );
+
+  assert.equal(context.currentBadge, 74);
+  assert.equal(context.percentile, 60);
+  assert.equal(context.population, 100);
+  assert.equal(context.recentTrend, 2);
+
+  const unranked = buildRankContext(
+    { badge: 0, rank: 0, subrank: 0 },
+    [{ badge_level: 64, unique_players: 100 }],
+    [],
+  );
+  assert.equal(unranked.currentBadge, null);
+  assert.equal(unranked.percentile, null);
 });
 
 test("processed matches supplement stale player history", () => {

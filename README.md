@@ -26,6 +26,17 @@ veröffentlicht.
 Damit wachsen Teamroster und Builds nicht mehr mit der Startdatei. Auch bei mehreren
 tausend Matches bleibt die initial geladene Datenmenge begrenzt.
 
+## Intelligence-Module
+
+- Vollständiges, clientseitig filterbares Matcharchiv mit paginierten Detaildaten
+- persönlicher Build- und Ability-Coach auf Basis der eigenen Matchhistorie
+- Gegner-Analyse pro eigenem Hero und über den gesamten Hero Pool
+- Rank-Kontext mit persönlichem Peak, Kurztrend und 30-Tage-Rangverteilung
+
+Coach- und Matchup-Werte zeigen Korrelationen aus der vorhandenen Stichprobe. Sie
+werden bewusst nicht als garantierte Ursache oder allgemeingültige Meta-Empfehlung
+ausgegeben.
+
 Die Deadlock API ist ein Community-Projekt und nicht mit Valve verbunden.
 
 ## Konfiguration

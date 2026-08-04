@@ -293,6 +293,384 @@ function detailSection(title, description) {
   return section;
 }
 
+function coachFor(heroId) {
+  return state.data.heroCoach?.[String(heroId)] ?? null;
+}
+
+function buildItemIdentity(itemId) {
+  const asset = buildAssetFor(itemId) ?? { name: `Asset ${itemId}`, image: null };
+  const identity = create("span", "coach-identity");
+  if (asset.image) {
+    const image = create("img");
+    image.src = asset.image;
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    identity.append(image);
+  }
+  identity.append(create("strong", "", asset.name));
+  return identity;
+}
+
+function buildHeroCoachSection(heroId) {
+  const coach = coachFor(heroId);
+  const hero = heroFor(heroId);
+  if (!coach || (!coach.items?.length && !coach.abilityOrders?.length)) return null;
+  const section = detailSection(
+    "Build- & Ability-Coach",
+    `Aus deinen ${coach.matches} erfassten ${hero.name}-Matches. Zusammenhänge sind Hinweise, keine garantierte Ursache.`,
+  );
+  const coreItem = coach.items?.[0] ?? null;
+  const positiveItem = [...(coach.items ?? [])]
+    .filter((item) => item.matches >= 3 && item.winrate > coach.baselineWinrate)
+    .sort((a, b) => (b.winrate - coach.baselineWinrate) - (a.winrate - coach.baselineWinrate))[0] ?? null;
+  const commonOrder = coach.abilityOrders?.[0] ?? null;
+  section.append(metricGrid([
+    {
+      label: "Core Item",
+      value: coreItem ? buildAssetFor(coreItem.itemId)?.name ?? `Asset ${coreItem.itemId}` : "—",
+      note: coreItem ? `${percentFormat.format(coreItem.usageRate)}% deiner Matches` : "Noch keine Daten",
+    },
+    {
+      label: "Positives Signal",
+      value: positiveItem ? buildAssetFor(positiveItem.itemId)?.name ?? `Asset ${positiveItem.itemId}` : "—",
+      note: positiveItem ? `${signedDifference(positiveItem.winrate, coach.baselineWinrate, " Pkt.")} vs. Hero-Bilanz` : "Mindestens drei Käufe nötig",
+    },
+    {
+      label: "Häufigster Ability-Start",
+      value: commonOrder ? commonOrder.abilityIds.map((id) => buildAssetFor(id)?.name ?? id).join(" → ") : "—",
+      note: commonOrder ? `${commonOrder.matches} erfasste Matches` : "Noch keine Daten",
+    },
+  ], "coach-summary"));
+
+  if (coach.items?.length) {
+    const block = create("div", "coach-block");
+    block.append(create("h4", "", "Deine häufigsten Items"));
+    const rows = create("div", "coach-list");
+    for (const item of coach.items.slice(0, 8)) {
+      const row = create("div", "coach-row");
+      const delta = item.winrate - coach.baselineWinrate;
+      const sampleIsUseful = item.matches >= 3;
+      const stats = create("span", "coach-row-stats");
+      stats.append(
+        create("strong", sampleIsUseful ? (delta >= 0 ? "positive" : "negative") : "", `${percentFormat.format(item.winrate)}% WR`),
+        create("small", "", `${item.matches} Matches · ${percentFormat.format(item.usageRate)}% Pickrate`),
+      );
+      const timing = create("span", "coach-timing");
+      timing.append(
+        create("strong", "", `Ø ${formatDuration(item.avgBuySeconds)}`),
+        create("small", "", sampleIsUseful ? `${signedDifference(item.winrate, coach.baselineWinrate, " Pkt.")} vs. Hero-Bilanz` : "Kleine Stichprobe"),
+      );
+      row.append(buildItemIdentity(item.itemId), stats, timing);
+      rows.append(row);
+    }
+    block.append(rows);
+    section.append(block);
+  }
+
+  if (coach.abilityOrders?.length) {
+    const block = create("div", "coach-block");
+    block.append(create("h4", "", "Deine häufigsten Ability-Startfolgen"));
+    const orders = create("div", "ability-order-list");
+    for (const [orderIndex, order] of coach.abilityOrders.slice(0, 3).entries()) {
+      const card = create("div", "ability-order");
+      const sequence = create("div", "ability-sequence");
+      for (const [index, abilityId] of order.abilityIds.entries()) {
+        const step = create("span", "ability-step");
+        step.append(create("small", "", String(index + 1)), buildItemIdentity(abilityId));
+        sequence.append(step);
+      }
+      const meta = create("span", "ability-order-meta");
+      meta.append(
+        create("strong", order.matches >= 2 && order.winrate >= coach.baselineWinrate ? "positive" : "", `${percentFormat.format(order.winrate)}% WR`),
+        create("small", "", `${order.matches} ${order.matches === 1 ? "Match" : "Matches"}`),
+      );
+      card.append(create("span", "ability-order-rank", `0${orderIndex + 1}`), sequence, meta);
+      orders.append(card);
+    }
+    block.append(orders);
+    section.append(block);
+  }
+  return section;
+}
+
+function matchupCard(matchup) {
+  const hero = heroFor(matchup.enemyHeroId);
+  const card = create("article", "matchup-card");
+  const identity = create("div", "matchup-identity");
+  if (hero.image) {
+    const image = create("img");
+    image.src = hero.image;
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    identity.append(image);
+  }
+  const copy = create("span");
+  copy.append(create("strong", "", hero.name), create("small", "", `${matchup.matches} Begegnungen`));
+  identity.append(copy);
+  const result = create("span", "matchup-result");
+  result.append(
+    create("strong", matchup.winrate >= 50 ? "positive" : "negative", `${percentFormat.format(matchup.winrate)}%`),
+    create("small", "", `${matchup.wins} Siege`),
+  );
+  card.append(identity, result);
+  return card;
+}
+
+function aggregateMatchups(heroId = null) {
+  const totals = new Map();
+  for (const row of state.data.matchups ?? []) {
+    if (heroId != null && row.heroId !== heroId) continue;
+    const current = totals.get(row.enemyHeroId) ?? {
+      enemyHeroId: row.enemyHeroId,
+      matches: 0,
+      wins: 0,
+    };
+    current.matches += row.matches;
+    current.wins += row.wins;
+    totals.set(row.enemyHeroId, current);
+  }
+  return [...totals.values()].map((row) => ({
+    ...row,
+    winrate: row.matches ? (row.wins / row.matches) * 100 : 0,
+  }));
+}
+
+function buildHeroMatchupSection(heroId) {
+  const matchups = aggregateMatchups(heroId).filter((row) => row.matches >= 2);
+  if (!matchups.length) return null;
+  const hero = heroFor(heroId);
+  const section = detailSection(
+    "Gegner-Analyse",
+    `Deine Bilanz mit ${hero.name}, wenn der jeweilige Gegner-Hero im anderen Team stand.`,
+  );
+  const difficult = [...matchups].sort((a, b) => a.winrate - b.winrate || b.matches - a.matches).slice(0, 4);
+  const grid = create("div", "matchup-grid");
+  difficult.forEach((row) => grid.append(matchupCard(row)));
+  section.append(grid);
+  return section;
+}
+
+function heroChoiceBar(heroIds, selectedHeroId, onSelect) {
+  const bar = create("div", "hero-choice-bar");
+  for (const heroId of heroIds) {
+    const hero = heroFor(heroId);
+    const button = create("button", "hero-choice", hero.name);
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(heroId === selectedHeroId));
+    button.addEventListener("click", () => onSelect(heroId));
+    bar.append(button);
+  }
+  return bar;
+}
+
+function openCoach() {
+  const heroIds = groupHeroes(selectedMatches())
+    .map((group) => group.heroId)
+    .filter((heroId) => {
+      const coach = coachFor(heroId);
+      return coach && (coach.items?.length || coach.abilityOrders?.length);
+    });
+  const body = create("div", "detail-stack");
+  if (!heroIds.length) {
+    body.append(create("p", "sample-notice", "Für den Coach sind noch keine vollständigen Build-Daten verfügbar."));
+  } else {
+    let selectedHeroId = heroIds[0];
+    const choiceHost = create("div");
+    const content = create("div");
+    const render = () => {
+      choiceHost.replaceChildren(heroChoiceBar(heroIds, selectedHeroId, (heroId) => {
+        selectedHeroId = heroId;
+        render();
+      }));
+      const section = buildHeroCoachSection(selectedHeroId);
+      content.replaceChildren();
+      if (section) content.append(section);
+    };
+    render();
+    body.append(choiceHost, content);
+  }
+  openDetail({
+    eyebrow: "PERSONAL COACH",
+    title: "Build & Ability Intelligence",
+    subtitle: "Muster aus deiner vollständigen Matchhistorie",
+    body,
+  });
+}
+
+function openEnemyAnalysis() {
+  const heroGroups = groupHeroes(selectedMatches());
+  const body = create("div", "detail-stack");
+  const controls = create("div", "analysis-controls");
+  const label = create("label");
+  label.append(create("span", "", "Dein Hero"));
+  const select = create("select");
+  select.append(new Option("Alle Heroes", "all"));
+  for (const group of heroGroups) select.append(new Option(heroFor(group.heroId).name, String(group.heroId)));
+  label.append(select);
+  controls.append(label, create("p", "", "Ausgewertet wird, ob der Gegner-Hero im anderen Team stand – unabhängig von Lane oder Rolle."));
+  const content = create("div", "detail-stack");
+  const render = () => {
+    const heroId = select.value === "all" ? null : Number(select.value);
+    const matchups = aggregateMatchups(heroId).filter((row) => row.matches >= 3);
+    content.replaceChildren();
+    if (!matchups.length) {
+      content.append(create("p", "sample-notice", "Für diese Auswahl gibt es noch keine belastbare Gegner-Stichprobe."));
+      return;
+    }
+    const difficult = detailSection("Schwierigste Gegner", "Niedrigste persönliche Winrate · mindestens drei Begegnungen.");
+    const difficultGrid = create("div", "matchup-grid");
+    [...matchups].sort((a, b) => a.winrate - b.winrate || b.matches - a.matches).slice(0, 6)
+      .forEach((row) => difficultGrid.append(matchupCard(row)));
+    difficult.append(difficultGrid);
+    const successful = detailSection("Beste Bilanz", "Höchste persönliche Winrate · mindestens drei Begegnungen.");
+    const successfulGrid = create("div", "matchup-grid");
+    [...matchups].sort((a, b) => b.winrate - a.winrate || b.matches - a.matches).slice(0, 6)
+      .forEach((row) => successfulGrid.append(matchupCard(row)));
+    successful.append(successfulGrid);
+    content.append(difficult, successful);
+  };
+  select.addEventListener("change", render);
+  render();
+  body.append(controls, content);
+  openDetail({
+    eyebrow: "OPPONENT INTELLIGENCE",
+    title: "Gegner-Analyse",
+    subtitle: "Matchups aus deiner vollständigen persönlichen Historie",
+    body,
+  });
+}
+
+function openRankContext() {
+  const context = state.data.rankContext ?? {};
+  const body = create("div", "detail-stack");
+  const current = rankDetails(context.currentBadge);
+  const peak = rankDetails(context.peakBadge);
+  body.append(metricGrid([
+    { label: "Aktueller Rang", value: current.label },
+    {
+      label: "Globaler Kontext",
+      value: context.percentile == null ? "—" : `Top ${percentFormat.format(100 - context.percentile)}%`,
+      note: context.percentile == null ? "Keine Verteilung verfügbar" : `Höher eingestuft als ${percentFormat.format(context.percentile)}%`,
+    },
+    { label: "Persönlicher Peak", value: peak.label },
+    {
+      label: "Trend letzte 10",
+      value: context.recentTrend == null ? "—" : `${context.recentTrend >= 0 ? "+" : ""}${context.recentTrend}`,
+      tone: context.recentTrend == null ? "" : (context.recentTrend >= 0 ? "positive" : "negative"),
+      note: `${context.rankedMatches ?? 0} Ranked Matches erfasst`,
+    },
+  ]));
+  const distribution = detailSection(
+    "Rangverteilung der letzten 30 Tage",
+    `${numberFormat.format(context.population ?? 0)} aktive Spieler im verfügbaren API-Zeitraum.`,
+  );
+  const bars = create("div", "rank-distribution");
+  const maxShare = Math.max(1, ...(context.distribution ?? []).map((row) => row.share));
+  for (const row of context.distribution ?? []) {
+    const rank = state.data.ranks?.[String(row.tier)];
+    const item = create("div", "rank-distribution-row");
+    item.append(create("span", "", rank?.name ?? `Tier ${row.tier}`));
+    const track = create("span", "rank-distribution-track");
+    const fill = create("span");
+    fill.style.width = `${(row.share / maxShare) * 100}%`;
+    if (rank?.color) fill.style.background = rank.color;
+    track.append(fill);
+    item.append(track, create("strong", "", `${percentFormat.format(row.share)}%`));
+    bars.append(item);
+  }
+  if (bars.childElementCount) distribution.append(bars);
+  else distribution.append(create("p", "sample-notice", "Die globale Rangverteilung ist momentan nicht verfügbar."));
+  body.append(distribution);
+  openDetail({
+    eyebrow: "RANK INTELLIGENCE",
+    title: "Dein Rang im Kontext",
+    subtitle: "Persönlicher Verlauf und Einordnung unter aktiven Ranked-Spielern",
+    body,
+  });
+}
+
+function archiveSelect(labelText, values, selected, onChange) {
+  const label = create("label", "archive-filter");
+  label.append(create("span", "", labelText));
+  const select = create("select");
+  for (const [value, labelValue] of values) select.append(new Option(labelValue, value));
+  select.value = selected;
+  select.addEventListener("change", () => onChange(select.value));
+  label.append(select);
+  return label;
+}
+
+function openMatchArchive() {
+  const archive = { hero: "all", result: "all", mode: "all", sort: "newest", query: "", page: 1 };
+  const pageSize = 25;
+  const body = create("div", "detail-stack");
+  const filters = create("div", "archive-filters");
+  const searchLabel = create("label", "archive-filter archive-search");
+  searchLabel.append(create("span", "", "Suche"));
+  const search = create("input");
+  search.type = "search";
+  search.placeholder = "Hero oder Match-ID";
+  searchLabel.append(search);
+  const results = create("div", "archive-results");
+  const pagination = create("div", "archive-pagination");
+  const modes = [...new Set(selectedMatches().map((match) => match.mode))].sort();
+  const heroGroups = groupHeroes(selectedMatches());
+
+  const render = () => {
+    let matches = selectedMatches().filter((match) => {
+      if (archive.hero !== "all" && match.heroId !== Number(archive.hero)) return false;
+      if (archive.result !== "all" && match.result !== archive.result) return false;
+      if (archive.mode !== "all" && match.mode !== archive.mode) return false;
+      if (archive.query) {
+        const haystack = `${match.id} ${heroFor(match.heroId).name}`.toLowerCase();
+        if (!haystack.includes(archive.query.toLowerCase())) return false;
+      }
+      return true;
+    });
+    matches = [...matches].sort((a, b) => {
+      if (archive.sort === "oldest") return new Date(a.startedAt) - new Date(b.startedAt);
+      if (archive.sort === "kda") return matchKda(b) - matchKda(a);
+      if (archive.sort === "spm") return b.soulsPerMinute - a.soulsPerMinute;
+      return new Date(b.startedAt) - new Date(a.startedAt);
+    });
+    const pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
+    archive.page = Math.min(archive.page, pageCount);
+    const visible = matches.slice((archive.page - 1) * pageSize, archive.page * pageSize);
+    results.replaceChildren();
+    if (visible.length) results.append(compactMatchList(visible));
+    else results.append(create("p", "sample-notice", "Keine Matches entsprechen diesen Filtern."));
+    pagination.replaceChildren();
+    const previous = create("button", "insight-action", "← Zurück");
+    previous.type = "button";
+    previous.disabled = archive.page === 1;
+    previous.addEventListener("click", () => { archive.page -= 1; render(); });
+    const next = create("button", "insight-action", "Weiter →");
+    next.type = "button";
+    next.disabled = archive.page === pageCount;
+    next.addEventListener("click", () => { archive.page += 1; render(); });
+    pagination.append(previous, create("span", "", `${matches.length} Matches · Seite ${archive.page} von ${pageCount}`), next);
+  };
+
+  filters.append(
+    searchLabel,
+    archiveSelect("Hero", [["all", "Alle Heroes"], ...heroGroups.map((group) => [String(group.heroId), heroFor(group.heroId).name])], archive.hero, (value) => { archive.hero = value; archive.page = 1; render(); }),
+    archiveSelect("Ergebnis", [["all", "Alle Ergebnisse"], ["win", "Siege"], ["loss", "Niederlagen"]], archive.result, (value) => { archive.result = value; archive.page = 1; render(); }),
+    archiveSelect("Modus", [["all", "Alle Modi"], ...modes.map((mode) => [mode, mode])], archive.mode, (value) => { archive.mode = value; archive.page = 1; render(); }),
+    archiveSelect("Sortierung", [["newest", "Neueste zuerst"], ["oldest", "Älteste zuerst"], ["kda", "Beste KDA"], ["spm", "Höchste SPM"]], archive.sort, (value) => { archive.sort = value; archive.page = 1; render(); }),
+  );
+  search.addEventListener("input", () => { archive.query = search.value.trim(); archive.page = 1; render(); });
+  render();
+  body.append(filters, results, pagination);
+  openDetail({
+    eyebrow: "FULL MATCH ARCHIVE",
+    title: "Vollständiges Matcharchiv",
+    subtitle: `${selectedMatches().length} Matches · filterbar und chronologisch durchsuchbar`,
+    body,
+  });
+}
+
 function compactMatchList(matches) {
   const list = create("div", "compact-match-list");
   for (const match of matches) {
@@ -388,6 +766,11 @@ function openHeroDetail(heroId) {
     { label: "Peak Net Worth", value: numberFormat.format(Math.max(...matches.map((match) => match.netWorth))) },
   ]));
   body.append(records);
+
+  const coach = buildHeroCoachSection(heroId);
+  if (coach) body.append(coach);
+  const matchups = buildHeroMatchupSection(heroId);
+  if (matchups) body.append(matchups);
 
   const recent = detailSection("Letzte Matches", `Die letzten ${Math.min(6, matches.length)} Auftritte mit ${hero.name}.`);
   recent.append(compactMatchList(matches.slice(0, 6)));
@@ -958,6 +1341,11 @@ function showReady(data) {
       renderHeroCards(sortHeroGroups(groupHeroes(selectedMatches()), state.heroSort));
     });
   }
+
+  byId("rank-details-button")?.addEventListener("click", openRankContext);
+  byId("coach-button")?.addEventListener("click", openCoach);
+  byId("enemy-analysis-button")?.addEventListener("click", openEnemyAnalysis);
+  byId("match-archive-button")?.addEventListener("click", openMatchArchive);
 
   text(
     "footer-update",

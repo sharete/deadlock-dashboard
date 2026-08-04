@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 const STEAM_ID64_BASE = 76561197960265728n;
 const DEADLOCK_APP_ID = 1422450;
 const DEFAULT_API_BASE = "https://api.deadlock-api.com";
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const RECENT_MATCH_LIMIT = 12;
 const HISTORY_PAGE_SIZE = 100;
 const root = new URL("../", import.meta.url);
@@ -267,6 +267,24 @@ export function buildMatchPlayersUrl(apiBase, matchIds) {
   return url;
 }
 
+export function buildHeroMatchupsUrl(apiBase, accountId) {
+  const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/sql`);
+  url.searchParams.set(
+    "query",
+    [
+      "SELECT self.hero_id AS hero_id, enemy.hero_id AS enemy_hero_id,",
+      "count() AS matches_played, countIf(self.team = self.winning_team) AS wins",
+      "FROM match_player AS self FINAL",
+      "INNER JOIN match_player AS enemy FINAL",
+      "ON self.match_id = enemy.match_id AND self.team != enemy.team",
+      `WHERE self.account_id = ${boundedInteger(accountId, 0, 0, 4_294_967_295)}`,
+      "GROUP BY self.hero_id, enemy.hero_id",
+      "ORDER BY matches_played DESC",
+    ].join(" "),
+  );
+  return url;
+}
+
 export function mergeMatchSources(matchHistory, processedMatches) {
   const byMatchId = new Map();
 
@@ -297,6 +315,155 @@ function heroAccentColor(colors) {
   return null;
 }
 
+export function buildHeroCoach(matches, buildAssets) {
+  const coaches = {};
+  const matchesByHero = new Map();
+  for (const match of matches) {
+    const heroMatches = matchesByHero.get(match.heroId) ?? [];
+    heroMatches.push(match);
+    matchesByHero.set(match.heroId, heroMatches);
+  }
+
+  for (const [heroId, heroMatches] of matchesByHero) {
+    const itemStats = new Map();
+    const abilityOrders = new Map();
+
+    for (const match of heroMatches) {
+      const firstItems = new Map();
+      const firstAbilities = [];
+      const seenAbilities = new Set();
+      for (const event of [...(match.build ?? [])].sort((a, b) => a.atSeconds - b.atSeconds)) {
+        const asset = buildAssets[String(event.itemId)];
+        if (asset?.type === "upgrade" && !firstItems.has(event.itemId)) {
+          firstItems.set(event.itemId, event);
+        }
+        if (asset?.type === "ability" && !seenAbilities.has(event.itemId)) {
+          seenAbilities.add(event.itemId);
+          firstAbilities.push(event.itemId);
+        }
+      }
+
+      for (const [itemId, event] of firstItems) {
+        const current = itemStats.get(itemId) ?? {
+          itemId,
+          matches: 0,
+          wins: 0,
+          totalBuySeconds: 0,
+          winBuySeconds: 0,
+          lossBuySeconds: 0,
+          winBuys: 0,
+          lossBuys: 0,
+        };
+        current.matches += 1;
+        current.wins += match.result === "win" ? 1 : 0;
+        current.totalBuySeconds += Math.max(0, asNumber(event.atSeconds));
+        if (match.result === "win") {
+          current.winBuys += 1;
+          current.winBuySeconds += Math.max(0, asNumber(event.atSeconds));
+        } else if (match.result === "loss") {
+          current.lossBuys += 1;
+          current.lossBuySeconds += Math.max(0, asNumber(event.atSeconds));
+        }
+        itemStats.set(itemId, current);
+      }
+
+      if (firstAbilities.length) {
+        const abilityIds = firstAbilities.slice(0, 4);
+        const key = abilityIds.join("-");
+        const current = abilityOrders.get(key) ?? { abilityIds, matches: 0, wins: 0 };
+        current.matches += 1;
+        current.wins += match.result === "win" ? 1 : 0;
+        abilityOrders.set(key, current);
+      }
+    }
+
+    const items = [...itemStats.values()]
+      .map((item) => ({
+        itemId: item.itemId,
+        matches: item.matches,
+        wins: item.wins,
+        winrate: item.matches ? (item.wins / item.matches) * 100 : 0,
+        usageRate: heroMatches.length ? (item.matches / heroMatches.length) * 100 : 0,
+        avgBuySeconds: item.matches ? item.totalBuySeconds / item.matches : 0,
+        avgWinBuySeconds: item.winBuys ? item.winBuySeconds / item.winBuys : null,
+        avgLossBuySeconds: item.lossBuys ? item.lossBuySeconds / item.lossBuys : null,
+      }))
+      .sort((a, b) => b.matches - a.matches || b.winrate - a.winrate)
+      .slice(0, 12);
+    const orders = [...abilityOrders.values()]
+      .map((order) => ({
+        ...order,
+        winrate: order.matches ? (order.wins / order.matches) * 100 : 0,
+      }))
+      .sort((a, b) => b.matches - a.matches || b.winrate - a.winrate)
+      .slice(0, 4);
+
+    coaches[String(heroId)] = {
+      matches: heroMatches.length,
+      baselineWinrate:
+        heroMatches.filter((match) => match.result === "win").length / Math.max(1, heroMatches.length) * 100,
+      items,
+      abilityOrders: orders,
+    };
+  }
+  return coaches;
+}
+
+export function buildRankContext(rankSnapshot, badgeDistribution, matches) {
+  const latestMatchBadge = matches.find((match) => match.rankBadge != null)?.rankBadge ?? null;
+  const currentBadge = asNumber(rankSnapshot?.badge, latestMatchBadge ?? 0) || latestMatchBadge;
+  const distribution = Array.isArray(badgeDistribution)
+    ? badgeDistribution
+        .map((row) => ({
+          badge: asNumber(row.badge_level),
+          players: Math.max(0, asNumber(row.unique_players)),
+        }))
+        .filter((row) => row.badge > 0 && row.players > 0)
+    : [];
+  const totalPlayers = distribution.reduce((sum, row) => sum + row.players, 0);
+  const playersBelow = currentBadge == null
+    ? 0
+    : distribution.filter((row) => row.badge < currentBadge).reduce((sum, row) => sum + row.players, 0);
+  const byTier = new Map();
+  for (const row of distribution) {
+    const tier = Math.floor(row.badge / 10);
+    byTier.set(tier, (byTier.get(tier) ?? 0) + row.players);
+  }
+  const rankedMatches = matches.filter((match) => match.rankBadge != null);
+  const peakBadge = rankedMatches.reduce(
+    (peak, match) => Math.max(peak, asNumber(match.rankBadge)),
+    currentBadge ?? 0,
+  ) || null;
+  const recentRanked = rankedMatches.slice(0, 10);
+  const badgeScore = (badge) => {
+    const tier = Math.floor(asNumber(badge) / 10);
+    const subrank = asNumber(badge) % 10;
+    return tier * 6 + Math.max(0, subrank - 1);
+  };
+  const rankTrend = recentRanked.length >= 2
+    ? badgeScore(recentRanked[0].rankBadge) - badgeScore(recentRanked.at(-1).rankBadge)
+    : null;
+
+  return {
+    currentBadge: currentBadge ?? null,
+    peakBadge,
+    rank: asNumber(rankSnapshot?.rank, currentBadge == null ? 0 : Math.floor(currentBadge / 10)),
+    subrank: asNumber(rankSnapshot?.subrank, currentBadge == null ? 0 : currentBadge % 10),
+    percentile: currentBadge != null && totalPlayers ? (playersBelow / totalPlayers) * 100 : null,
+    population: totalPlayers,
+    windowDays: 30,
+    rankedMatches: rankedMatches.length,
+    recentTrend: rankTrend,
+    distribution: [...byTier.entries()]
+      .map(([tier, players]) => ({
+        tier,
+        players,
+        share: totalPlayers ? (players / totalPlayers) * 100 : 0,
+      }))
+      .sort((a, b) => a.tier - b.tier),
+  };
+}
+
 export function buildDashboardData({
   steamId64,
   profile,
@@ -307,6 +474,9 @@ export function buildDashboardData({
   itemAssets = [],
   heroStats = [],
   rankAssets,
+  rankSnapshot = null,
+  badgeDistribution = [],
+  heroMatchups = [],
   timezone = "Europe/Berlin",
   generatedAt = new Date().toISOString(),
 }) {
@@ -349,6 +519,7 @@ export function buildDashboardData({
   const usedHeroIds = new Set([
     ...matches.map((match) => match.heroId),
     ...matchPlayers.map((player) => asNumber(player.hero_id)),
+    ...heroMatchups.flatMap((row) => [asNumber(row.hero_id), asNumber(row.enemy_hero_id)]),
   ]);
   const heroes = Object.fromEntries(
     heroAssets
@@ -450,6 +621,21 @@ export function buildDashboardData({
 
   const deadlockGame = ownedGames.find((game) => asNumber(game.appid) === DEADLOCK_APP_ID);
   const newestMatch = matches.find((match) => match.startedAt)?.startedAt ?? null;
+  const matchupData = heroMatchups
+    .map((row) => {
+      const played = Math.max(0, asNumber(row.matches_played));
+      const wins = Math.max(0, asNumber(row.wins));
+      return {
+        heroId: asNumber(row.hero_id),
+        enemyHeroId: asNumber(row.enemy_hero_id),
+        matches: played,
+        wins,
+        winrate: played ? (wins / played) * 100 : 0,
+      };
+    })
+    .filter((row) => row.matches > 0 && row.heroId > 0 && row.enemyHeroId > 0);
+  const heroCoach = buildHeroCoach(matches, buildAssets);
+  const rankContext = buildRankContext(rankSnapshot, badgeDistribution, matches);
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -476,6 +662,9 @@ export function buildDashboardData({
     heroes,
     buildAssets,
     heroBenchmarks,
+    heroCoach,
+    matchups: matchupData,
+    rankContext,
     ranks,
     matches,
     source: {
@@ -615,6 +804,12 @@ async function main() {
     : {};
 
   const processedMatchesUrl = buildProcessedMatchesUrl(apiBase, accountId);
+  const heroMatchupsUrl = buildHeroMatchupsUrl(apiBase, accountId);
+  const badgeDistributionUrl = new URL(`${apiBase}/v1/analytics/badge-distribution`);
+  badgeDistributionUrl.searchParams.set(
+    "min_unix_timestamp",
+    String(Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60),
+  );
 
   const [
     profilePayload,
@@ -625,6 +820,9 @@ async function main() {
     itemAssets,
     heroStats,
     rankAssets,
+    rankSnapshot,
+    badgeDistribution,
+    heroMatchups,
   ] = await Promise.all([
     fetchJson(profileUrl, { label: "Steam-Profil" }),
     fetchJson(gamesUrl, { label: "Steam-Spielzeit" }),
@@ -658,6 +856,27 @@ async function main() {
       label: "Deadlock-Ränge",
       headers: deadlockHeaders,
     }),
+    fetchJson(`${apiBase}/v1/players/${accountId}/rank`, {
+      label: "Aktueller Deadlock-Rang",
+      headers: deadlockHeaders,
+    }).catch((error) => {
+      console.warn(`Aktueller Rang nicht verfügbar: ${error.message}`);
+      return null;
+    }),
+    fetchJson(badgeDistributionUrl, {
+      label: "Deadlock-Rangverteilung",
+      headers: deadlockHeaders,
+    }).catch((error) => {
+      console.warn(`Rangverteilung nicht verfügbar: ${error.message}`);
+      return [];
+    }),
+    fetchJson(heroMatchupsUrl, {
+      label: "Persönliche Gegneranalyse",
+      headers: deadlockHeaders,
+    }).catch((error) => {
+      console.warn(`Gegneranalyse nicht verfügbar: ${error.message}`);
+      return [];
+    }),
   ]);
 
   const profile = profilePayload?.response?.players?.[0];
@@ -670,6 +889,10 @@ async function main() {
     throw new Error("Die Deadlock-Assetdaten haben ein ungültiges Format.");
   }
   if (!Array.isArray(heroStats)) throw new Error("Die Hero-Vergleichswerte haben ein ungültiges Format.");
+
+  if (!Array.isArray(badgeDistribution) || !Array.isArray(heroMatchups)) {
+    throw new Error("Die erweiterten Analysewerte haben ein ungültiges Format.");
+  }
 
   const currentMatchHistory = mergeMatchSources(matchHistory, processedMatches);
   const rosterMatchIds = [...currentMatchHistory]
@@ -697,6 +920,9 @@ async function main() {
     itemAssets,
     heroStats,
     rankAssets,
+    rankSnapshot,
+    badgeDistribution,
+    heroMatchups,
     timezone: config.timezone,
   });
 

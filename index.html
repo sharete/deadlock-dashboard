@@ -132,7 +132,10 @@
                   <p class="panel-kicker">RANK SIGNAL</p>
                   <h2>Rangentwicklung</h2>
                 </div>
-                <span class="panel-context" id="rank-context">Ranked Matches</span>
+                <div class="panel-heading-actions">
+                  <span class="panel-context" id="rank-context">Ranked Matches</span>
+                  <button type="button" class="insight-action" id="rank-details-button">Rank-Kontext →</button>
+                </div>
               </div>
               <div class="chart-wrap">
                 <canvas id="rank-chart" aria-label="Verlauf des Deadlock-Rangs"></canvas>
@@ -173,6 +176,10 @@
                   <button type="button" data-hero-sort="winrate" aria-pressed="false">Winrate</button>
                   <button type="button" data-hero-sort="kda" aria-pressed="false">KDA</button>
                 </div>
+                <div class="section-actions" aria-label="Erweiterte Hero-Analysen">
+                  <button type="button" class="insight-action" id="coach-button">Build- &amp; Ability-Coach</button>
+                  <button type="button" class="insight-action" id="enemy-analysis-button">Gegner-Analyse →</button>
+                </div>
               </div>
             </div>
             <div class="hero-grid" id="hero-grid"></div>
@@ -195,7 +202,10 @@
                 <p class="eyebrow">MATCH INTELLIGENCE</p>
                 <h2 id="matches-title">Letzte Matches</h2>
               </div>
-              <p id="match-coverage">—</p>
+              <div class="match-heading-actions">
+                <p id="match-coverage">—</p>
+                <button type="button" class="insight-action is-primary" id="match-archive-button">Vollständiges Archiv →</button>
+              </div>
             </div>
             <div class="match-table-wrap">
               <table class="match-table">
