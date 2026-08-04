@@ -14,6 +14,18 @@ veröffentlicht.
 5. GitHub Pages veröffentlicht ausschließlich die aufbereiteten JSON-Daten und
    die statische Website. Zugangsdaten gelangen nie in den Browser.
 
+## Skalierbare Datenablage
+
+- `data/dashboard.json` enthält den kompakten Matchindex für Statistiken und Diagramme.
+- `data/recent-matches.json` enthält ausschließlich die zwölf neuesten Matches mit
+  vollständigen Teamaufstellungen und Builds.
+- `data/history/index.json` beschreibt die vollständige Historie.
+- `data/history/page-XXXX.json` enthält jeweils bis zu 100 ältere Matchdetails und
+  wird im Browser erst beim Öffnen eines solchen Matches geladen.
+
+Damit wachsen Teamroster und Builds nicht mehr mit der Startdatei. Auch bei mehreren
+tausend Matches bleibt die initial geladene Datenmenge begrenzt.
+
 Die Deadlock API ist ein Community-Projekt und nicht mit Valve verbunden.
 
 ## Konfiguration
@@ -34,7 +46,7 @@ Optionale Werte:
 ## Aktualisierung
 
 Der Workflow `Deploy Deadlock Dashboard to Pages` läuft bei Änderungen, manuell
-und zweimal pro Stunde. Er prüft die Anwendung, lädt aktuelle Daten und
+und alle fünf Minuten. Er prüft die Anwendung, lädt aktuelle Daten und
 veröffentlicht anschließend das fertige Pages-Artefakt.
 
 ## Lokale Prüfung

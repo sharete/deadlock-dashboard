@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildDashboardData,
   buildMatchPlayersUrl,
+  buildPublishedDataFiles,
   buildProcessedMatchesUrl,
   mergeMatchSources,
   parseSteamProfileReference,
@@ -111,6 +112,67 @@ test("the complete raw match history is normalized", () => {
   assert.equal(Math.round(result.heroBenchmarks["1"].winrate), 55);
   assert.equal(result.ranks["7"].name, "Oracle");
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
+
+  const published = buildPublishedDataFiles(result);
+  assert.equal(published.dashboard.schemaVersion, 3);
+  assert.equal(published.dashboard.matches.length, 105);
+  assert.equal(published.dashboard.matches[0].historyPage, 1);
+  assert.equal(published.dashboard.matches[104].historyPage, 2);
+  assert.equal("build" in published.dashboard.matches[0], false);
+  assert.equal("players" in published.dashboard.matches[0], false);
+  assert.equal(published.recentMatches.matches.length, 12);
+  assert.equal(published.recentMatches.matches[0].players.length, 2);
+  assert.equal(published.historyPages.length, 2);
+  assert.equal(published.historyPages[0].data.matches.length, 100);
+  assert.equal(published.historyPages[1].data.matches.length, 5);
+  assert.equal(published.historyPages[0].data.matches[0].build.length, 2);
+  assert.equal("players" in published.historyPages[0].data.matches[0], false);
+  assert.equal(published.historyIndex.totalMatches, 105);
+  assert.ok(JSON.stringify(published.dashboard).length < JSON.stringify(result).length);
+});
+
+test("a multi-thousand-match history stays paginated and roster-bounded", () => {
+  const player = {
+    accountId: 1,
+    heroId: 1,
+    team: 0,
+    kills: 10,
+    deaths: 5,
+    assists: 8,
+    netWorth: 45_000,
+    build: [{ itemId: 100, atSeconds: 120, soldAtSeconds: 0, upgradeId: 0 }],
+    isSelf: true,
+  };
+  const matches = Array.from({ length: 2_005 }, (_, index) => ({
+    id: String(100_000 - index),
+    heroId: 1,
+    startedAt: new Date(1_800_000_000_000 - index * 60_000).toISOString(),
+    durationSeconds: 1_800,
+    result: index % 2 ? "loss" : "win",
+    kills: 10,
+    deaths: 5,
+    assists: 8,
+    netWorth: 45_000,
+    soulsPerMinute: 1_500,
+    build: [{ itemId: 100, atSeconds: 120, soldAtSeconds: 0, upgradeId: 0 }],
+    players: index < 12 ? Array.from({ length: 12 }, () => ({ ...player })) : [],
+  }));
+
+  const published = buildPublishedDataFiles({
+    schemaVersion: 3,
+    state: "ready",
+    generatedAt: "2026-08-04T12:00:00.000Z",
+    matches,
+  });
+
+  assert.equal(published.dashboard.matches.length, 2_005);
+  assert.equal(published.recentMatches.matches.length, 12);
+  assert.equal(published.recentMatches.matches[0].players.length, 12);
+  assert.equal(published.historyPages.length, 21);
+  assert.equal(published.historyPages[20].data.matches.length, 5);
+  assert.equal(published.historyIndex.pages.length, 21);
+  assert.equal("build" in published.dashboard.matches[2_000], false);
+  assert.equal("players" in published.historyPages[0].data.matches[0], false);
 });
 
 test("an unscored match still uses the actual winning team", () => {

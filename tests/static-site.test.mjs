@@ -29,6 +29,9 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /HERO_SAMPLE_MIN = 3/);
   assert.match(script, /function openHeroDetail/);
   assert.match(script, /function openMatchDetail/);
+  assert.match(script, /function loadHistoryPage/);
+  assert.match(script, /dataFiles\.recentMatches/);
+  assert.match(script, /historyPagePattern/);
   assert.match(script, /function renderRosterPlayerDetail/);
   assert.match(script, /Build und Werte von/);
   assert.match(script, /image\.decoding = "async"/);
@@ -51,7 +54,7 @@ test("the Pages workflow generates and deploys static data", async () => {
   assert.match(workflow, /path: _site/);
   assert.match(workflow, /cp app\/globals\.css _site\/dashboard\.css/);
   assert.doesNotMatch(workflow, /cp index\.html dashboard\.css/);
-  assert.match(workflow, /cp data\/dashboard\.json/);
+  assert.match(workflow, /cp -r data\/\. _site\/data\//);
   assert.match(workflow, /dashboard\.js\?v=\$\{GITHUB_SHA\}-\$\{GITHUB_RUN_ID\}/);
   assert.doesNotMatch(workflow, /STEAM_API_KEY:\s*[A-Za-z0-9]{20,}/);
 });
@@ -66,5 +69,7 @@ test("credential files stay outside Git", async () => {
   assert.match(example, /^STEAM_API_KEY=$/m);
   assert.match(ignore, /^\.env\*$/m);
   assert.match(ignore, /^!\.env\.example$/m);
+  assert.match(ignore, /^\/data\/recent-matches\.json$/m);
+  assert.match(ignore, /^\/data\/history\/$/m);
   assert.doesNotMatch(seed, /[A-Fa-f0-9]{32}/);
 });

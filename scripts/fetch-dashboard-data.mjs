@@ -1,10 +1,13 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const STEAM_ID64_BASE = 76561197960265728n;
 const DEADLOCK_APP_ID = 1422450;
 const DEFAULT_API_BASE = "https://api.deadlock-api.com";
+const SCHEMA_VERSION = 3;
+const RECENT_MATCH_LIMIT = 12;
+const HISTORY_PAGE_SIZE = 100;
 const root = new URL("../", import.meta.url);
 
 function asNumber(value, fallback = 0) {
@@ -449,7 +452,7 @@ export function buildDashboardData({
   const newestMatch = matches.find((match) => match.startedAt)?.startedAt ?? null;
 
   return {
-    schemaVersion: 2,
+    schemaVersion: SCHEMA_VERSION,
     state: "ready",
     generatedAt,
     timezone,
@@ -483,6 +486,88 @@ export function buildDashboardData({
   };
 }
 
+function historyFileName(page) {
+  return `page-${String(page).padStart(4, "0")}.json`;
+}
+
+function matchWithoutRoster(match) {
+  const { players, ...historyMatch } = match;
+  return historyMatch;
+}
+
+function compactMatch(match, historyPage) {
+  const { build, players, ...summaryMatch } = match;
+  return { ...summaryMatch, historyPage };
+}
+
+export function buildPublishedDataFiles(
+  dashboard,
+  { recentLimit = RECENT_MATCH_LIMIT, pageSize = HISTORY_PAGE_SIZE } = {},
+) {
+  const boundedRecentLimit = boundedInteger(recentLimit, RECENT_MATCH_LIMIT, 1, 50);
+  const boundedPageSize = boundedInteger(pageSize, HISTORY_PAGE_SIZE, 25, 250);
+  const matches = Array.isArray(dashboard.matches) ? dashboard.matches : [];
+  const historyPages = [];
+  const historyManifestPages = [];
+
+  for (let offset = 0; offset < matches.length; offset += boundedPageSize) {
+    const page = Math.floor(offset / boundedPageSize) + 1;
+    const pageMatches = matches.slice(offset, offset + boundedPageSize).map(matchWithoutRoster);
+    const fileName = historyFileName(page);
+    historyPages.push({
+      fileName,
+      data: {
+        schemaVersion: SCHEMA_VERSION,
+        generatedAt: dashboard.generatedAt,
+        page,
+        matches: pageMatches,
+      },
+    });
+    historyManifestPages.push({
+      page,
+      file: `./${fileName}`,
+      count: pageMatches.length,
+      newestMatch: pageMatches[0]?.startedAt ?? null,
+      oldestMatch: pageMatches.at(-1)?.startedAt ?? null,
+    });
+  }
+
+  const summaryMatches = matches.map((match, index) =>
+    compactMatch(match, Math.floor(index / boundedPageSize) + 1),
+  );
+  const coreDashboard = {
+    ...dashboard,
+    schemaVersion: SCHEMA_VERSION,
+    matches: summaryMatches,
+    dataFiles: {
+      recentMatches: "./data/recent-matches.json",
+      historyIndex: "./data/history/index.json",
+      historyPagePattern: "./data/history/page-{page}.json",
+    },
+  };
+
+  return {
+    dashboard: coreDashboard,
+    recentMatches: {
+      schemaVersion: SCHEMA_VERSION,
+      generatedAt: dashboard.generatedAt,
+      matches: matches.slice(0, boundedRecentLimit),
+    },
+    historyIndex: {
+      schemaVersion: SCHEMA_VERSION,
+      generatedAt: dashboard.generatedAt,
+      totalMatches: matches.length,
+      pageSize: boundedPageSize,
+      pages: historyManifestPages,
+    },
+    historyPages,
+  };
+}
+
+async function writeJson(url, value) {
+  await writeFile(url, `${JSON.stringify(value)}\n`, "utf8");
+}
+
 async function main() {
   const config = JSON.parse(await readFile(new URL("config/dashboard.json", root), "utf8"));
   const steamApiKey = String(process.env.STEAM_API_KEY ?? "").trim();
@@ -492,7 +577,7 @@ async function main() {
 
   if (!String(process.env.STEAM_ID64 ?? "").trim() && !String(config.steamProfile ?? "").trim()) {
     const setupData = {
-      schemaVersion: 2,
+      schemaVersion: SCHEMA_VERSION,
       state: "setup",
       generatedAt: new Date().toISOString(),
       profile: null,
@@ -505,11 +590,7 @@ async function main() {
         missing: ["steamProfile", "matchData"],
       },
     };
-    await writeFile(
-      new URL("data/dashboard.json", root),
-      `${JSON.stringify(setupData, null, 2)}\n`,
-      "utf8",
-    );
+    await writeJson(new URL("data/dashboard.json", root), setupData);
     console.log("Setup-Dashboard veröffentlicht: Steam-Profil fehlt noch.");
     return;
   }
@@ -619,14 +700,21 @@ async function main() {
     timezone: config.timezone,
   });
 
-  await writeFile(
-    new URL("data/dashboard.json", root),
-    `${JSON.stringify(dashboard, null, 2)}\n`,
-    "utf8",
-  );
+  const published = buildPublishedDataFiles(dashboard);
+  const historyDirectory = new URL("data/history/", root);
+  await rm(historyDirectory, { recursive: true, force: true });
+  await mkdir(historyDirectory, { recursive: true });
+  await Promise.all([
+    writeJson(new URL("data/dashboard.json", root), published.dashboard),
+    writeJson(new URL("data/recent-matches.json", root), published.recentMatches),
+    writeJson(new URL("data/history/index.json", root), published.historyIndex),
+    ...published.historyPages.map((page) =>
+      writeJson(new URL(`data/history/${page.fileName}`, root), page.data),
+    ),
+  ]);
 
   console.log(
-    `Dashboard aktualisiert: ${dashboard.profile.name}, ${dashboard.matches.length} Matches veröffentlicht.`,
+    `Dashboard aktualisiert: ${dashboard.profile.name}, ${dashboard.matches.length} Matches in ${published.historyPages.length} Historienpaketen veröffentlicht.`,
   );
 }
 

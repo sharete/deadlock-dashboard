@@ -1,6 +1,8 @@
 const state = {
   data: null,
   heroSort: "matches",
+  recentMatches: [],
+  historyPages: new Map(),
 };
 
 const HERO_SAMPLE_MIN = 3;
@@ -78,6 +80,53 @@ function rankDetails(badge) {
 
 function selectedMatches() {
   return state.data.matches;
+}
+
+function versionedDataUrl(path) {
+  const url = new URL(path, document.baseURI);
+  url.searchParams.set("v", state.data?.generatedAt || Date.now());
+  return url;
+}
+
+async function loadHistoryPage(page) {
+  if (!Number.isInteger(page) || page < 1) return [];
+  if (state.historyPages.has(page)) return state.historyPages.get(page);
+
+  const pattern = state.data.dataFiles?.historyPagePattern;
+  if (!pattern) return [];
+  const path = pattern.replace("{page}", String(page).padStart(4, "0"));
+  const request = fetch(versionedDataUrl(path), { cache: "force-cache" })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((payload) => (Array.isArray(payload.matches) ? payload.matches : []))
+    .catch((error) => {
+      state.historyPages.delete(page);
+      throw error;
+    });
+  state.historyPages.set(page, request);
+  return request;
+}
+
+async function resolveMatchDetail(match) {
+  if (Array.isArray(match.build) || Array.isArray(match.players)) return match;
+  const recent = state.recentMatches.find((candidate) => candidate.id === match.id);
+  if (recent && (Array.isArray(recent.build) || Array.isArray(recent.players))) return recent;
+  try {
+    const pageMatches = await loadHistoryPage(match.historyPage);
+    return pageMatches.find((candidate) => candidate.id === match.id) ?? { ...match, build: [], players: [] };
+  } catch {
+    return { ...match, build: [], players: [] };
+  }
+}
+
+async function openResolvedMatchDetail(match, trigger) {
+  if (trigger?.getAttribute("aria-busy") === "true") return;
+  trigger?.setAttribute("aria-busy", "true");
+  const detail = await resolveMatchDetail(match);
+  trigger?.removeAttribute("aria-busy");
+  openMatchDetail(detail);
 }
 
 function summarize(matches) {
@@ -277,7 +326,7 @@ function compactMatchList(matches) {
       create("small", "", `${match.kills}/${match.deaths}/${match.assists} · ${numberFormat.format(match.soulsPerMinute)} SPM`),
     );
     button.append(identity, result);
-    button.addEventListener("click", () => openMatchDetail(match));
+    button.addEventListener("click", () => openResolvedMatchDetail(match, button));
     list.append(button);
   }
   return list;
@@ -560,7 +609,7 @@ function renderRosterPlayerDetail(match, player, target) {
 }
 
 function buildTimeline(match, type, title, description) {
-  const events = match.build
+  const events = (match.build ?? [])
     .map((event) => ({ ...event, asset: buildAssetFor(event.itemId) }))
     .filter((event) => event.asset?.type === type)
     .sort((a, b) => a.atSeconds - b.atSeconds);
@@ -686,11 +735,11 @@ function renderMatches(matches) {
     row.className = "match-row";
     row.tabIndex = 0;
     row.setAttribute("aria-label", `Matchdetails zu ${hero.name} öffnen`);
-    row.addEventListener("click", () => openMatchDetail(match));
+    row.addEventListener("click", () => openResolvedMatchDetail(match, row));
     row.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        openMatchDetail(match);
+        openResolvedMatchDetail(match, row);
       }
     });
 
@@ -858,7 +907,7 @@ function renderDashboard() {
   renderHeroSort();
   renderHeroCards(sortHeroGroups(heroGroups, state.heroSort));
   renderSessions(matches);
-  renderMatches(matches);
+  renderMatches(state.recentMatches.length ? state.recentMatches : matches.slice(0, 12));
   drawRankChart(matches);
   text(
     "match-coverage",
@@ -934,6 +983,19 @@ async function init() {
     if (data.state !== "ready" || !Array.isArray(data.matches) || !data.profile) {
       showSetup(data.setup?.message);
       return;
+    }
+    state.data = data;
+    state.historyPages.clear();
+    state.recentMatches = data.matches.slice(0, 12);
+    if (data.dataFiles?.recentMatches) {
+      try {
+        const recentResponse = await fetch(versionedDataUrl(data.dataFiles.recentMatches), { cache: "force-cache" });
+        if (!recentResponse.ok) throw new Error(`HTTP ${recentResponse.status}`);
+        const recentPayload = await recentResponse.json();
+        if (Array.isArray(recentPayload.matches)) state.recentMatches = recentPayload.matches;
+      } catch {
+        // The compact summary remains usable if the optional detail payload is temporarily unavailable.
+      }
     }
     showReady(data);
   } catch {

@@ -54,7 +54,7 @@ jobs:
           cp app/globals.css _site/dashboard.css
           sed -i "s|./dashboard.css|./dashboard.css?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|; s|./dashboard.js|./dashboard.js?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|" _site/index.html
           cp -r public/. _site/public/
-          cp data/dashboard.json _site/data/dashboard.json
+          cp -r data/. _site/data/
 
       - name: Pages-Artefakt hochladen
         uses: actions/upload-pages-artifact@v3

@@ -264,6 +264,7 @@ button { color: inherit; }
 .match-table tbody tr { transition: background 160ms ease; }
 .match-table tbody tr:hover { background: rgba(255,255,255,0.025); }
 .match-row { cursor: pointer; }
+.match-row[aria-busy="true"] { cursor: wait; opacity: 0.68; }
 .match-row:focus-visible { outline: 2px solid var(--acid); outline-offset: -2px; background: rgba(215,255,100,0.035); }
 .match-id { display: grid; gap: 5px; }
 .match-id strong { color: var(--text); font-size: 12px; }
@@ -312,6 +313,7 @@ button { color: inherit; }
 .compact-match { width: 100%; min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 13px; border: 1px solid transparent; border-radius: 11px; background: rgba(255,255,255,0.022); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .compact-match:hover { border-color: rgba(215,255,100,0.2); }
 .compact-match:focus-visible { outline: 2px solid var(--acid); outline-offset: 1px; }
+.compact-match[aria-busy="true"] { cursor: wait; opacity: 0.68; }
 .compact-match-identity { display: flex; align-items: center; gap: 11px; }
 .compact-match-identity img { width: 40px; height: 40px; border-radius: 9px; object-fit: cover; object-position: center top; background: #080b0a; }
 .compact-match-identity > span, .compact-result { display: grid; gap: 4px; }
