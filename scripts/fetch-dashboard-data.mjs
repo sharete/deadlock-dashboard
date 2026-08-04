@@ -125,10 +125,13 @@ function matchOutcome(match) {
   const outcome = asNumber(match.player_match_outcome, 0);
   if (outcome === 1) return "win";
   if (outcome === 2 || outcome === 3 || outcome === 4) return "loss";
-  if (outcome === 5) return "unscored";
-  return asNumber(match.match_result, -1) === asNumber(match.player_team, -2)
-    ? "win"
-    : "loss";
+
+  // "Not scored" only describes whether the match affected progression. It
+  // still has a winning team and must count towards the visible win/loss
+  // record, matching Deadlock's account statistics.
+  const matchResult = asNumber(match.match_result, -1);
+  const playerTeam = asNumber(match.player_team, -2);
+  return matchResult >= 0 && playerTeam >= 0 && matchResult === playerTeam ? "win" : "loss";
 }
 
 function matchMode(value) {
@@ -157,6 +160,7 @@ function normalizeMatch(match) {
     durationSeconds,
     mode: matchMode(match.match_mode),
     result: matchOutcome(match),
+    isScored: asNumber(match.player_match_outcome, 0) !== 5,
     kills: asNumber(match.player_kills),
     deaths: asNumber(match.player_deaths),
     assists: asNumber(match.player_assists),

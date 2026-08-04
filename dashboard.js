@@ -254,7 +254,8 @@ function renderMatches(matches) {
     const resultCell = document.createElement("td");
     const result = document.createElement("span");
     result.className = `result-pill ${match.result === "win" ? "is-win" : "is-loss"}`;
-    result.textContent = match.result === "win" ? "Sieg" : "Niederlage";
+    const resultLabel = match.result === "win" ? "Sieg" : "Niederlage";
+    result.textContent = match.isScored === false ? `${resultLabel} · ungewertet` : resultLabel;
     resultCell.append(result);
 
     const kdaCell = document.createElement("td");

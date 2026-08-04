@@ -73,6 +73,31 @@ test("raw match history is normalized and capped", () => {
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
 });
 
+test("an unscored match still uses the actual winning team", () => {
+  const result = buildDashboardData({
+    steamId64: "76561197960265729",
+    profile: { personaname: "Test Player" },
+    ownedGames: [],
+    matchHistory: [
+      {
+        match_id: 94_422_365,
+        hero_id: 13,
+        start_time: 1_784_381_982,
+        match_mode: 1,
+        player_team: 0,
+        match_result: 0,
+        player_match_outcome: 5,
+        match_duration_s: 2_000,
+      },
+    ],
+    heroAssets: [{ id: 13, name: "Haze", images: {} }],
+    rankAssets: [],
+  });
+
+  assert.equal(result.matches[0].result, "win");
+  assert.equal(result.matches[0].isScored, false);
+});
+
 test("processed match query is scoped and capped", () => {
   const url = buildProcessedMatchesUrl("https://api.deadlock-api.com/", 64_862, 500);
   const query = url.searchParams.get("query");

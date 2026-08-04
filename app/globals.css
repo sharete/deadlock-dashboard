@@ -248,7 +248,7 @@ button { color: inherit; }
 .match-id small { color: var(--quiet); }
 .table-hero { display: flex; align-items: center; gap: 11px; font-weight: 700; color: var(--text); }
 .table-hero img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; object-position: center top; background: #090c0b; }
-.result-pill { display: inline-flex; min-width: 66px; min-height: 27px; align-items: center; justify-content: center; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.result-pill { display: inline-flex; min-width: 66px; min-height: 27px; padding: 0 10px; align-items: center; justify-content: center; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 .result-pill.is-win { color: var(--mint); background: rgba(114,226,181,0.09); border: 1px solid rgba(114,226,181,0.18); }
 .result-pill.is-loss { color: var(--red); background: rgba(255,109,115,0.08); border: 1px solid rgba(255,109,115,0.16); }
 .rank-cell { display: grid; gap: 4px; }
