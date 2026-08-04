@@ -178,6 +178,17 @@
             <div class="hero-grid" id="hero-grid"></div>
           </section>
 
+          <section class="content-section" aria-labelledby="sessions-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">SESSION INTELLIGENCE</p>
+                <h2 id="sessions-title">Deine Spielsessions</h2>
+              </div>
+              <p>Die letzten sechs Sessions · Matches mit höchstens 90 Minuten Abstand werden zusammengefasst.</p>
+            </div>
+            <div class="session-grid" id="session-grid"></div>
+          </section>
+
           <section class="content-section" aria-labelledby="matches-title">
             <div class="section-heading">
               <div>
@@ -205,6 +216,20 @@
           </section>
         </div>
       </main>
+
+      <dialog class="detail-dialog" id="detail-dialog" aria-labelledby="detail-title">
+        <div class="detail-shell">
+          <header class="detail-header">
+            <div>
+              <p class="eyebrow" id="detail-eyebrow">PERFORMANCE DETAIL</p>
+              <h2 id="detail-title">Details</h2>
+              <p id="detail-subtitle"></p>
+            </div>
+            <button type="button" class="detail-close" id="detail-close" aria-label="Detailansicht schließen">×</button>
+          </header>
+          <div class="detail-body" id="detail-body"></div>
+        </div>
+      </dialog>
 
       <footer>
         <span>DEADLOCK PERSONAL INTELLIGENCE</span>

@@ -17,6 +17,10 @@ function boundedInteger(value, fallback, min, max) {
   return Math.max(min, Math.min(max, number));
 }
 
+function asNumberArray(value) {
+  return Array.isArray(value) ? value.map((entry) => asNumber(entry)) : [];
+}
+
 function cleanUrl(value) {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
@@ -151,6 +155,10 @@ function normalizeMatch(match) {
   const durationSeconds = Math.max(0, asNumber(match.match_duration_s));
   const netWorth = Math.max(0, asNumber(match.net_worth));
   const startedAt = asNumber(match.start_time);
+  const buildItemIds = asNumberArray(match.build_item_ids);
+  const buildTimes = asNumberArray(match.build_times_s);
+  const buildSoldTimes = asNumberArray(match.build_sold_times_s);
+  const buildUpgradeIds = asNumberArray(match.build_upgrade_ids);
 
   return {
     id: String(match.match_id),
@@ -159,6 +167,7 @@ function normalizeMatch(match) {
     startedAt: startedAt > 0 ? new Date(startedAt * 1000).toISOString() : null,
     durationSeconds,
     mode: matchMode(match.match_mode),
+    team: asNumber(match.player_team, -1),
     result: matchOutcome(match),
     isScored: asNumber(match.player_match_outcome, 0) !== 5,
     kills: asNumber(match.player_kills),
@@ -168,6 +177,20 @@ function normalizeMatch(match) {
     soulsPerMinute: durationSeconds > 0 ? Math.round((netWorth / durationSeconds) * 60) : 0,
     lastHits: asNumber(match.last_hits),
     denies: asNumber(match.denies),
+    playerDamage: asNumber(match.player_damage),
+    damageTaken: asNumber(match.damage_taken),
+    playerHealing: asNumber(match.player_healing),
+    damageMitigated: asNumber(match.damage_mitigated),
+    bossDamage: asNumber(match.boss_damage),
+    creepDamage: asNumber(match.creep_damage),
+    shotsHit: asNumber(match.shots_hit),
+    shotsMissed: asNumber(match.shots_missed),
+    build: buildItemIds.map((itemId, index) => ({
+      itemId,
+      atSeconds: buildTimes[index] ?? 0,
+      soldAtSeconds: buildSoldTimes[index] ?? 0,
+      upgradeId: buildUpgradeIds[index] ?? 0,
+    })),
     rankBadge: match.ranked_display_badge == null ? null : asNumber(match.ranked_display_badge),
     rankDelta: match.ranked_delta == null ? null : asNumber(match.ranked_delta),
   };
@@ -191,12 +214,40 @@ export function buildProcessedMatchesUrl(apiBase, accountId) {
       "deaths AS player_deaths,",
       "assists AS player_assists,",
       "net_worth, last_hits, denies,",
+      "max_player_damage AS player_damage,",
+      "max_player_damage_taken AS damage_taken,",
+      "arrayMax(stats.player_healing) AS player_healing,",
+      "arrayMax(stats.damage_mitigated) AS damage_mitigated,",
+      "max_boss_damage AS boss_damage,",
+      "max_creep_damage AS creep_damage,",
+      "max_shots_hit AS shots_hit, max_shots_missed AS shots_missed,",
+      "items.item_id AS build_item_ids, items.game_time_s AS build_times_s,",
+      "items.sold_time_s AS build_sold_times_s, items.upgrade_id AS build_upgrade_ids,",
       "toInt8(player_match_outcome) AS player_match_outcome,",
       "player_rank_initial_display_rank AS ranked_display_badge,",
       "player_rank_desired_progress_change AS ranked_delta",
       "FROM match_player FINAL",
       `WHERE account_id = ${boundedInteger(accountId, 0, 0, 4_294_967_295)}`,
       "ORDER BY start_time DESC",
+    ].join(" "),
+  );
+  return url;
+}
+
+export function buildMatchPlayersUrl(apiBase, matchIds) {
+  const ids = [...new Set(matchIds)]
+    .map((matchId) => boundedInteger(matchId, 0, 1, Number.MAX_SAFE_INTEGER))
+    .filter(Boolean)
+    .slice(0, 12);
+  const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/sql`);
+  url.searchParams.set(
+    "query",
+    [
+      "SELECT match_id, account_id, toInt8(team) AS team, hero_id,",
+      "kills, deaths, assists, net_worth",
+      "FROM match_player FINAL",
+      `WHERE match_id IN (${ids.length ? ids.join(",") : "0"})`,
+      "ORDER BY match_id DESC, team ASC, net_worth DESC",
     ].join(" "),
   );
   return url;
@@ -237,7 +288,10 @@ export function buildDashboardData({
   profile,
   ownedGames,
   matchHistory,
+  matchPlayers = [],
   heroAssets,
+  itemAssets = [],
+  heroStats = [],
   rankAssets,
   timezone = "Europe/Berlin",
   generatedAt = new Date().toISOString(),
@@ -247,7 +301,30 @@ export function buildDashboardData({
     .sort((a, b) => asNumber(b.start_time) - asNumber(a.start_time))
     .map(normalizeMatch);
 
-  const usedHeroIds = new Set(matches.map((match) => match.heroId));
+  const playersByMatch = new Map();
+  for (const player of matchPlayers) {
+    const matchId = String(player.match_id);
+    const roster = playersByMatch.get(matchId) ?? [];
+    roster.push({
+      accountId: asNumber(player.account_id),
+      heroId: asNumber(player.hero_id),
+      team: asNumber(player.team, -1),
+      kills: asNumber(player.kills),
+      deaths: asNumber(player.deaths),
+      assists: asNumber(player.assists),
+      netWorth: asNumber(player.net_worth),
+      isSelf: asNumber(player.account_id) === accountId,
+    });
+    playersByMatch.set(matchId, roster);
+  }
+  for (const match of matches) {
+    match.players = playersByMatch.get(match.id) ?? [];
+  }
+
+  const usedHeroIds = new Set([
+    ...matches.map((match) => match.heroId),
+    ...matchPlayers.map((player) => asNumber(player.hero_id)),
+  ]);
   const heroes = Object.fromEntries(
     heroAssets
       .filter((hero) => usedHeroIds.has(asNumber(hero.id)))
@@ -264,6 +341,65 @@ export function buildDashboardData({
           color: heroAccentColor(hero.colors),
         },
       ]),
+  );
+
+  const usedBuildAssetIds = new Set(
+    matches.flatMap((match) => match.build.map((event) => event.itemId)),
+  );
+  const buildAssets = Object.fromEntries(
+    itemAssets
+      .filter((item) => usedBuildAssetIds.has(asNumber(item.id)))
+      .map((item) => [
+        String(item.id),
+        {
+          id: asNumber(item.id),
+          name: String(item.name || item.class_name || `Item ${item.id}`),
+          type: String(item.type || "unknown"),
+          image:
+            cleanUrl(item.shop_image_webp) ??
+            cleanUrl(item.image_webp) ??
+            cleanUrl(item.shop_image) ??
+            cleanUrl(item.image),
+          tier: item.item_tier == null ? null : asNumber(item.item_tier),
+          slot: typeof item.item_slot_type === "string" ? item.item_slot_type : null,
+          cost: item.cost == null ? null : asNumber(item.cost),
+        },
+      ]),
+  );
+
+  const benchmarkTotals = new Map();
+  for (const row of heroStats) {
+    const heroId = asNumber(row.hero_id);
+    if (!usedHeroIds.has(heroId)) continue;
+    const total = benchmarkTotals.get(heroId) ?? {
+      matches: 0,
+      wins: 0,
+      kills: 0,
+      deaths: 0,
+      assists: 0,
+      netWorth: 0,
+      playerDamage: 0,
+    };
+    total.matches += asNumber(row.matches);
+    total.wins += asNumber(row.wins);
+    total.kills += asNumber(row.total_kills);
+    total.deaths += asNumber(row.total_deaths);
+    total.assists += asNumber(row.total_assists);
+    total.netWorth += asNumber(row.total_net_worth);
+    total.playerDamage += asNumber(row.total_player_damage);
+    benchmarkTotals.set(heroId, total);
+  }
+  const heroBenchmarks = Object.fromEntries(
+    [...benchmarkTotals.entries()].map(([heroId, total]) => [
+      String(heroId),
+      {
+        matches: total.matches,
+        winrate: total.matches ? (total.wins / total.matches) * 100 : 0,
+        kda: (total.kills + total.assists) / Math.max(1, total.deaths),
+        avgNetWorth: total.netWorth / Math.max(1, total.matches),
+        avgPlayerDamage: total.playerDamage / Math.max(1, total.matches),
+      },
+    ]),
   );
 
   const ranks = Object.fromEntries(
@@ -286,7 +422,7 @@ export function buildDashboardData({
   const newestMatch = matches.find((match) => match.startedAt)?.startedAt ?? null;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     state: "ready",
     generatedAt,
     timezone,
@@ -308,6 +444,8 @@ export function buildDashboardData({
           : null,
     },
     heroes,
+    buildAssets,
+    heroBenchmarks,
     ranks,
     matches,
     source: {
@@ -327,7 +465,7 @@ async function main() {
 
   if (!String(process.env.STEAM_ID64 ?? "").trim() && !String(config.steamProfile ?? "").trim()) {
     const setupData = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       state: "setup",
       generatedAt: new Date().toISOString(),
       profile: null,
@@ -370,7 +508,16 @@ async function main() {
 
   const processedMatchesUrl = buildProcessedMatchesUrl(apiBase, accountId);
 
-  const [profilePayload, gamesPayload, matchHistory, processedMatches, heroAssets, rankAssets] = await Promise.all([
+  const [
+    profilePayload,
+    gamesPayload,
+    matchHistory,
+    processedMatches,
+    heroAssets,
+    itemAssets,
+    heroStats,
+    rankAssets,
+  ] = await Promise.all([
     fetchJson(profileUrl, { label: "Steam-Profil" }),
     fetchJson(gamesUrl, { label: "Steam-Spielzeit" }),
     fetchJson(`${apiBase}/v1/players/${accountId}/match-history`, {
@@ -388,6 +535,17 @@ async function main() {
       label: "Deadlock-Helden",
       headers: deadlockHeaders,
     }),
+    fetchJson(`${apiBase}/v1/assets/items?language=german`, {
+      label: "Deadlock-Items und Fähigkeiten",
+      headers: deadlockHeaders,
+    }),
+    fetchJson(`${apiBase}/v1/analytics/hero-stats?min_matches=20`, {
+      label: "Globale Deadlock-Hero-Statistiken",
+      headers: deadlockHeaders,
+    }).catch((error) => {
+      console.warn(`Hero-Vergleichswerte nicht verfügbar: ${error.message}`);
+      return [];
+    }),
     fetchJson(`${apiBase}/v1/assets/ranks?language=german`, {
       label: "Deadlock-Ränge",
       headers: deadlockHeaders,
@@ -400,18 +558,36 @@ async function main() {
   if (!Array.isArray(processedMatches)) {
     throw new Error("Die verarbeiteten Deadlock-Matches haben ein ungültiges Format.");
   }
-  if (!Array.isArray(heroAssets) || !Array.isArray(rankAssets)) {
+  if (!Array.isArray(heroAssets) || !Array.isArray(itemAssets) || !Array.isArray(rankAssets)) {
     throw new Error("Die Deadlock-Assetdaten haben ein ungültiges Format.");
   }
+  if (!Array.isArray(heroStats)) throw new Error("Die Hero-Vergleichswerte haben ein ungültiges Format.");
 
   const currentMatchHistory = mergeMatchSources(matchHistory, processedMatches);
+  const rosterMatchIds = [...currentMatchHistory]
+    .sort((a, b) => asNumber(b.start_time) - asNumber(a.start_time))
+    .slice(0, 12)
+    .map((match) => match.match_id);
+  const matchPlayers = await fetchJson(buildMatchPlayersUrl(apiBase, rosterMatchIds), {
+    label: "Teamaufstellungen der letzten Matches",
+    headers: deadlockHeaders,
+  }).catch((error) => {
+    console.warn(`Teamaufstellungen nicht verfügbar: ${error.message}`);
+    return [];
+  });
+  if (!Array.isArray(matchPlayers)) {
+    throw new Error("Die Teamaufstellungen haben ein ungültiges Format.");
+  }
 
   const dashboard = buildDashboardData({
     steamId64,
     profile,
     ownedGames: gamesPayload?.response?.games ?? [],
     matchHistory: currentMatchHistory,
+    matchPlayers,
     heroAssets,
+    itemAssets,
+    heroStats,
     rankAssets,
     timezone: config.timezone,
   });

@@ -17,12 +17,18 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(html, /data-hero-sort="winrate"/);
   assert.match(html, /data-hero-sort="kda"/);
   assert.match(html, /id="rank-chart"/);
+  assert.match(html, /id="session-grid"/);
+  assert.match(html, /id="detail-dialog"/);
   assert.match(html, /\.\/dashboard\.js/);
   assert.match(script, /data\/dashboard\.json/);
   assert.match(script, /match\.isScored === false/);
   assert.match(script, /ungewertet/);
   assert.doesNotMatch(script, /deadlock-analysis-window|windowSize/);
   assert.match(script, /function sortHeroGroups/);
+  assert.match(script, /HERO_SAMPLE_MIN = 3/);
+  assert.match(script, /function openHeroDetail/);
+  assert.match(script, /function openMatchDetail/);
+  assert.match(script, /function buildSessions/);
   assert.doesNotMatch(`${html}\n${script}`, /STEAM_API_KEY\s*=|NEXT_PUBLIC_/);
 });
 
