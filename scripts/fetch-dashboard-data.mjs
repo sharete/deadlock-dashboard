@@ -90,7 +90,13 @@ async function fetchJson(url, { label, headers = {}, retries = 2 } = {}) {
       if (!response.ok) {
         const retryable = response.status === 429 || response.status >= 500;
         if (retryable && attempt < retries) {
-          await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+          const retryAfter = Number(response.headers.get("retry-after"));
+          const delay = response.status === 429
+            ? Math.min(30_000, Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1_000
+              : 3_000 * (attempt + 1))
+            : 1_000 * (attempt + 1);
+          await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
         throw new Error(`${label} antwortete mit HTTP ${response.status}.`);
@@ -349,6 +355,32 @@ export function buildMatchPlayersUrl(apiBase, matchIds) {
       "death_details.death_duration_s AS death_durations_s,",
       "death_details.time_to_kill_s AS death_ttk_s,",
       "death_details.killer_player_slot AS death_killer_slots,",
+      "items.item_id AS build_item_ids, items.game_time_s AS build_times_s,",
+      "items.sold_time_s AS build_sold_times_s, items.upgrade_id AS build_upgrade_ids",
+      "FROM match_player FINAL",
+      `WHERE match_id IN (${ids.length ? ids.join(",") : "0"})`,
+      "ORDER BY match_id DESC, team ASC, net_worth DESC",
+    ].join(" "),
+  );
+  return url;
+}
+
+export function buildBasicMatchPlayersUrl(apiBase, matchIds) {
+  const ids = [...new Set(matchIds)]
+    .map((matchId) => boundedInteger(matchId, 0, 1, Number.MAX_SAFE_INTEGER))
+    .filter(Boolean)
+    .slice(0, 12);
+  const url = new URL(`${String(apiBase).replace(/\/$/, "")}/v1/sql`);
+  url.searchParams.set(
+    "query",
+    [
+      "SELECT match_id, account_id, toInt8(team) AS team, hero_id,",
+      "kills, deaths, assists, net_worth, last_hits, denies, assigned_lane, mvp_rank,",
+      "max_player_damage AS player_damage, max_player_damage_taken AS damage_taken,",
+      "arrayMax(stats.player_healing) AS player_healing,",
+      "arrayMax(stats.damage_mitigated) AS damage_mitigated,",
+      "max_boss_damage AS boss_damage, max_creep_damage AS creep_damage,",
+      "max_shots_hit AS shots_hit, max_shots_missed AS shots_missed,",
       "items.item_id AS build_item_ids, items.game_time_s AS build_times_s,",
       "items.sold_time_s AS build_sold_times_s, items.upgrade_id AS build_upgrade_ids",
       "FROM match_player FINAL",
@@ -1036,9 +1068,17 @@ async function main() {
   const matchPlayers = await fetchJson(buildMatchPlayersUrl(apiBase, rosterMatchIds), {
     label: "Teamaufstellungen der letzten Matches",
     headers: deadlockHeaders,
+    retries: 4,
   }).catch((error) => {
-    console.warn(`Teamaufstellungen nicht verfügbar: ${error.message}`);
-    return [];
+    console.warn(`Erweiterte Teamaufstellungen nicht verfügbar: ${error.message}`);
+    return fetchJson(buildBasicMatchPlayersUrl(apiBase, rosterMatchIds), {
+      label: "Basis-Teamaufstellungen der letzten Matches",
+      headers: deadlockHeaders,
+      retries: 4,
+    }).catch((fallbackError) => {
+      console.warn(`Teamaufstellungen nicht verfügbar: ${fallbackError.message}`);
+      return [];
+    });
   });
   if (!Array.isArray(matchPlayers)) {
     throw new Error("Die Teamaufstellungen haben ein ungültiges Format.");

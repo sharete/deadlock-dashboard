@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildBasicMatchPlayersUrl,
   buildDashboardData,
   buildHeroCoach,
   buildHeroMatchupsUrl,
@@ -278,6 +279,12 @@ test("team rosters are limited to the visible match details", () => {
   assert.match(query, /stats\.net_worth AS timeline_net_worth/);
   assert.match(query, /assigned_lane/);
   assert.doesNotMatch(query, /undefined|NaN/);
+
+  const fallbackQuery = buildBasicMatchPlayersUrl("https://api.deadlock-api.com/", [100, 101])
+    .searchParams.get("query");
+  assert.match(fallbackQuery, /match_id IN \(100,101\)/);
+  assert.match(fallbackQuery, /assigned_lane/);
+  assert.doesNotMatch(fallbackQuery, /timeline_net_worth/);
 });
 
 test("team economy aggregates aligned player timelines without publishing raw roster curves", () => {
