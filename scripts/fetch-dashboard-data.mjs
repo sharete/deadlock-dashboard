@@ -406,8 +406,8 @@ export function buildMatchMetadataUrl(apiBase, matchIds) {
     include_player_info: "true",
     include_player_kda: "true",
     include_player_items: "true",
-    include_player_stats: "false",
-    include_player_final_stats: "true",
+    include_player_stats: "true",
+    include_player_final_stats: "false",
     include_player_death_details: "false",
   })) {
     url.searchParams.set(name, value);
@@ -425,7 +425,8 @@ function enumTeamNumber(value) {
 export function flattenMatchMetadataPlayers(metadata) {
   if (!Array.isArray(metadata)) return [];
   return metadata.flatMap((match) => (Array.isArray(match.players) ? match.players : []).map((player) => {
-    const final = player.final_stats ?? {};
+    const stats = Array.isArray(player.stats) ? player.stats : [];
+    const final = player.final_stats ?? stats.at(-1) ?? {};
     const items = Array.isArray(player.items) ? player.items : [];
     return {
       match_id: match.match_id,
@@ -448,6 +449,8 @@ export function flattenMatchMetadataPlayers(metadata) {
       creep_damage: final.creep_damage,
       shots_hit: final.shots_hit,
       shots_missed: final.shots_missed,
+      timeline_times_s: stats.map((point) => point.time_stamp_s),
+      timeline_net_worth: stats.map((point) => point.net_worth),
       build_item_ids: items.map((item) => item.item_id),
       build_times_s: items.map((item) => item.game_time_s),
       build_sold_times_s: items.map((item) => item.sold_time_s),

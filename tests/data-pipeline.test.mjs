@@ -291,6 +291,7 @@ test("team rosters are limited to the visible match details", () => {
   const metadataUrl = buildMatchMetadataUrl("https://api.deadlock-api.com/", [100, 101]);
   assert.deepEqual(metadataUrl.searchParams.getAll("match_ids"), ["100", "101"]);
   assert.equal(metadataUrl.searchParams.get("include_player_items"), "true");
+  assert.equal(metadataUrl.searchParams.get("include_player_stats"), "true");
 });
 
 test("match metadata fallback is flattened into the roster contract", () => {
@@ -306,13 +307,18 @@ test("match metadata fallback is flattened into the roster contract", () => {
       net_worth: 42_000,
       assigned_lane: 2,
       items: [{ item_id: 100, game_time_s: 120, sold_time_s: 0, upgrade_id: 5 }],
-      final_stats: { player_damage: 30_000, player_healing: 4_000, shots_hit: 400 },
+      stats: [
+        { time_stamp_s: 180, net_worth: 2_000, player_damage: 1_000 },
+        { time_stamp_s: 360, net_worth: 4_500, player_damage: 30_000, player_healing: 4_000, shots_hit: 400 },
+      ],
     }],
   }]);
 
   assert.equal(rows.length, 1);
   assert.equal(rows[0].team, 0);
   assert.equal(rows[0].player_damage, 30_000);
+  assert.deepEqual(rows[0].timeline_times_s, [180, 360]);
+  assert.deepEqual(rows[0].timeline_net_worth, [2_000, 4_500]);
   assert.deepEqual(rows[0].build_item_ids, [100]);
   assert.deepEqual(rows[0].build_upgrade_ids, [5]);
 });
