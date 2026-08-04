@@ -353,7 +353,10 @@ function openHeroDetail(heroId) {
   ]));
 
   if (benchmark) {
-    const comparison = detailSection("Du gegen den API-Benchmark", `${numberFormat.format(benchmark.matches)} globale Hero-Matches als Referenz.`);
+    const comparison = detailSection(
+      "Deine Werte im globalen Vergleich",
+      `Verglichen mit dem Durchschnitt aus ${numberFormat.format(benchmark.matches)} weltweit erfassten ${hero.name}-Matches.`,
+    );
     const rows = create("div", "comparison-list");
     for (const row of [
       { label: "Winrate", personal: summary.winrate, reference: benchmark.winrate, format: (value) => `${percentFormat.format(value)}%`, suffix: " Pkt." },
@@ -367,7 +370,7 @@ function openHeroDetail(heroId) {
       const delta = row.personal - row.reference;
       const reference = create("span", "comparison-reference");
       reference.append(
-        create("small", "", `Benchmark ${row.format(row.reference)}`),
+        create("small", "", `Globaler Durchschnitt ${row.format(row.reference)}`),
         create("strong", delta >= 0 ? "positive" : "negative", signedDifference(row.personal, row.reference, row.suffix || "")),
       );
       item.append(copy, reference);

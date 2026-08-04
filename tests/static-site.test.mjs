@@ -28,6 +28,9 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /function sortHeroGroups/);
   assert.match(script, /HERO_SAMPLE_MIN = 3/);
   assert.match(script, /function openHeroDetail/);
+  assert.match(script, /Deine Werte im globalen Vergleich/);
+  assert.match(script, /Globaler Durchschnitt/);
+  assert.doesNotMatch(script, /Du gegen den API-Benchmark/);
   assert.match(script, /function openMatchDetail/);
   assert.match(script, /function loadHistoryPage/);
   assert.match(script, /dataFiles\.recentMatches/);
