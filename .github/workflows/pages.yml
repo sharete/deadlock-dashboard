@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
 
 permissions:
   contents: read
@@ -15,14 +15,15 @@ permissions:
 
 concurrency:
   group: github-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
+    runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
 
     steps:
       - name: Repository auschecken
@@ -32,6 +33,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
 
       - name: Statische Ausgabe prüfen
         run: npm test
@@ -52,12 +56,15 @@ jobs:
           mkdir -p _site/public _site/data
           cp index.html dashboard.js .nojekyll _site/
           cp app/globals.css _site/dashboard.css
-          sed -i "s|./dashboard.css|./dashboard.css?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|; s|./dashboard.js|./dashboard.js?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|" _site/index.html
+          sed -i \
+            "s|./dashboard.css|./dashboard.css?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|; \
+             s|./dashboard.js|./dashboard.js?v=${GITHUB_SHA}-${GITHUB_RUN_ID}|" \
+            _site/index.html
           cp -r public/. _site/public/
           cp -r data/. _site/data/
 
       - name: Pages-Artefakt hochladen
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: _site
 
