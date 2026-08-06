@@ -77,7 +77,7 @@ test("the Pages workflow generates and deploys static data", async () => {
   assert.match(workflow, /npm run generate/);
   assert.match(workflow, /secrets\.STEAM_API_KEY/);
   assert.match(workflow, /actions\/configure-pages@v5/);
-  assert.match(workflow, /actions\/upload-pages-artifact@v3/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /path: _site/);
   assert.match(workflow, /cp app\/globals\.css _site\/dashboard\.css/);
