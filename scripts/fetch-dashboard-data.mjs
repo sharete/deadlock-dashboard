@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 const STEAM_ID64_BASE = 76561197960265728n;
 const DEADLOCK_APP_ID = 1422450;
 const DEFAULT_API_BASE = "https://api.deadlock-api.com";
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const RECENT_MATCH_LIMIT = 12;
 const HISTORY_PAGE_SIZE = 100;
 const root = new URL("../", import.meta.url);
@@ -45,6 +45,33 @@ export function steamId64ToAccountId(value) {
     throw new Error("Die SteamID64 liegt außerhalb des gültigen Bereichs.");
   }
   return Number(accountId);
+}
+
+export function accountIdToSteamId64(value) {
+  const accountId = boundedInteger(value, -1, -1, 4_294_967_295);
+  if (accountId < 0) throw new Error("Die Account-ID liegt außerhalb des gültigen Bereichs.");
+  return String(STEAM_ID64_BASE + BigInt(accountId));
+}
+
+async function fetchOpponentProfiles(enemyStats, steamApiKey) {
+  const accountIds = [...new Set(
+    enemyStats.map((row) => boundedInteger(row.enemy_id, 0, 0, 4_294_967_295)).filter(Boolean),
+  )];
+  const batches = [];
+  for (let offset = 0; offset < accountIds.length; offset += 100) {
+    batches.push(accountIds.slice(offset, offset + 100));
+  }
+  const payloads = await Promise.all(batches.map((batch, index) => {
+    const url = new URL("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/");
+    url.searchParams.set("key", steamApiKey);
+    url.searchParams.set("steamids", batch.map(accountIdToSteamId64).join(","));
+    return fetchJson(url, { label: `Steam-Gegnerprofile ${index + 1}/${batches.length}` })
+      .catch((error) => {
+        console.warn(`Steam-Gegnerprofile nicht verfügbar: ${error.message}`);
+        return { response: { players: [] } };
+      });
+  }));
+  return payloads.flatMap((payload) => payload?.response?.players ?? []);
 }
 
 export function parseSteamProfileReference(value) {
@@ -688,6 +715,8 @@ export function buildDashboardData({
   rankSnapshot = null,
   badgeDistribution = [],
   heroMatchups = [],
+  enemyStats = [],
+  opponentProfiles = [],
   timezone = "Europe/Berlin",
   generatedAt = new Date().toISOString(),
 }) {
@@ -858,6 +887,32 @@ export function buildDashboardData({
     .filter((row) => row.matches > 0 && row.heroId > 0 && row.enemyHeroId > 0);
   const heroCoach = buildHeroCoach(matches, buildAssets);
   const rankContext = buildRankContext(rankSnapshot, badgeDistribution, matches);
+  const profilesBySteamId = new Map(
+    opponentProfiles.map((opponent) => [String(opponent.steamid), opponent]),
+  );
+  const opponents = enemyStats
+    .map((row) => {
+      const opponentAccountId = boundedInteger(row.enemy_id, 0, 0, 4_294_967_295);
+      const steamId = accountIdToSteamId64(opponentAccountId);
+      const opponent = profilesBySteamId.get(steamId);
+      const played = Math.max(0, asNumber(row.matches_played));
+      const wins = Math.min(played, Math.max(0, asNumber(row.wins)));
+      const losses = Math.max(0, played - wins);
+      return {
+        accountId: opponentAccountId,
+        steamId64: steamId,
+        name: String(opponent?.personaname || `Steam-Spieler ${opponentAccountId}`),
+        avatar: cleanUrl(opponent?.avatarmedium) ?? cleanUrl(opponent?.avatarfull),
+        profileUrl: cleanUrl(opponent?.profileurl) ?? `https://steamcommunity.com/profiles/${steamId}/`,
+        matches: played,
+        wins,
+        losses,
+        winrate: played ? (wins / played) * 100 : 0,
+        lossrate: played ? (losses / played) * 100 : 0,
+      };
+    })
+    .filter((opponent) => opponent.accountId > 0 && opponent.matches > 0)
+    .sort((a, b) => b.matches - a.matches || b.winrate - a.winrate || a.name.localeCompare(b.name, "de"));
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -886,6 +941,7 @@ export function buildDashboardData({
     heroBenchmarks,
     heroCoach,
     matchups: matchupData,
+    opponents,
     rankContext,
     ranks,
     matches,
@@ -1057,6 +1113,7 @@ async function main() {
     rankSnapshot,
     badgeDistribution,
     heroMatchups,
+    enemyStats,
   ] = await Promise.all([
     fetchJson(profileUrl, { label: "Steam-Profil" }),
     fetchJson(gamesUrl, { label: "Steam-Spielzeit" }),
@@ -1111,6 +1168,13 @@ async function main() {
       console.warn(`Gegneranalyse nicht verfügbar: ${error.message}`);
       return [];
     }),
+    fetchJson(`${apiBase}/v1/players/${accountId}/enemy-stats`, {
+      label: "Persönliche Gegnerbilanz",
+      headers: deadlockHeaders,
+    }).catch((error) => {
+      console.warn(`Gegnerbilanz nicht verfügbar: ${error.message}`);
+      return [];
+    }),
   ]);
 
   const profile = profilePayload?.response?.players?.[0];
@@ -1124,11 +1188,12 @@ async function main() {
   }
   if (!Array.isArray(heroStats)) throw new Error("Die Hero-Vergleichswerte haben ein ungültiges Format.");
 
-  if (!Array.isArray(badgeDistribution) || !Array.isArray(heroMatchups)) {
+  if (!Array.isArray(badgeDistribution) || !Array.isArray(heroMatchups) || !Array.isArray(enemyStats)) {
     throw new Error("Die erweiterten Analysewerte haben ein ungültiges Format.");
   }
 
   const currentMatchHistory = mergeMatchSources(matchHistory, processedMatches);
+  const opponentProfilesPromise = fetchOpponentProfiles(enemyStats, steamApiKey);
   const rosterMatchIds = [...currentMatchHistory]
     .sort((a, b) => asNumber(b.start_time) - asNumber(a.start_time))
     .slice(0, 12)
@@ -1165,6 +1230,7 @@ async function main() {
   if (!Array.isArray(matchPlayers)) {
     throw new Error("Die Teamaufstellungen haben ein ungültiges Format.");
   }
+  const opponentProfiles = await opponentProfilesPromise;
 
   const dashboard = buildDashboardData({
     steamId64,
@@ -1179,6 +1245,8 @@ async function main() {
     rankSnapshot,
     badgeDistribution,
     heroMatchups,
+    enemyStats,
+    opponentProfiles,
     timezone: config.timezone,
   });
 

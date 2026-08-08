@@ -262,6 +262,32 @@ button { color: inherit; }
 .session-stats .detail-metric small { margin-top: 3px; color: var(--quiet); font-size: 8px; }
 .session-card-footer { display: flex; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; }
 
+.opponent-toolbar { display: grid; grid-template-columns: minmax(280px, 1fr) 220px 220px; gap: 10px; margin-bottom: 12px; }
+.opponent-toolbar label { display: grid; gap: 7px; }
+.opponent-toolbar label > span { color: var(--quiet); font: 700 8px/1 ui-monospace, monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+.opponent-toolbar input, .opponent-toolbar select { width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; background: #0e1311; color: var(--text); font: inherit; font-size: 11px; }
+.opponent-toolbar input:focus, .opponent-toolbar select:focus { outline: 2px solid rgba(215,255,100,0.45); outline-offset: 1px; }
+.opponent-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+.opponent-table { width: 100%; min-width: 780px; border-collapse: collapse; }
+.opponent-table th { height: 48px; padding: 0 18px; border-bottom: 1px solid var(--line); color: var(--quiet); font: 700 9px/1 ui-monospace, monospace; letter-spacing: 0.11em; text-align: left; text-transform: uppercase; }
+.opponent-table td { height: 64px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,0.06); color: #cbd1ce; font-size: 12px; }
+.opponent-table tr:last-child td { border-bottom: 0; }
+.opponent-table tbody tr:hover { background: rgba(255,255,255,0.025); }
+.opponent-identity { display: inline-flex; align-items: center; gap: 11px; color: inherit; text-decoration: none; }
+.opponent-identity:hover strong { color: var(--acid); }
+.opponent-identity img, .opponent-avatar-fallback { width: 36px; height: 36px; flex: 0 0 auto; border-radius: 9px; background: #080b0a; }
+.opponent-identity img { object-fit: cover; }
+.opponent-avatar-fallback { display: grid; place-items: center; color: var(--acid); font-size: 13px; font-weight: 800; }
+.opponent-identity > span:last-child { display: grid; gap: 4px; }
+.opponent-identity strong { color: var(--text); font-size: 11px; }
+.opponent-identity small { color: var(--quiet); font-size: 8px; }
+.opponent-match-count { color: var(--text) !important; font-weight: 800; }
+.opponent-empty { height: 100px !important; color: var(--muted) !important; text-align: center; }
+.opponent-pagination { display: grid; grid-template-columns: 110px 1fr 110px; align-items: center; gap: 14px; margin-top: 12px; }
+.opponent-pagination button { min-height: 38px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,0.025); color: var(--text); font: inherit; font-size: 9px; font-weight: 700; cursor: pointer; }
+.opponent-pagination button:disabled { cursor: default; opacity: 0.35; }
+.opponent-pagination span { color: var(--muted); font-size: 9px; text-align: center; }
+
 .match-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
 .match-table { width: 100%; min-width: 940px; border-collapse: collapse; }
 .match-table th { height: 50px; padding: 0 18px; border-bottom: 1px solid var(--line); color: var(--quiet); font: 700 9px/1 ui-monospace, monospace; letter-spacing: 0.12em; text-align: left; text-transform: uppercase; }
@@ -466,6 +492,8 @@ noscript { position: fixed; inset: auto 20px 20px; z-index: 4; padding: 12px 16p
   .insight-layout { grid-template-columns: 1fr; }
   .hero-grid { grid-template-columns: repeat(2, 1fr); }
   .session-grid { grid-template-columns: repeat(2, 1fr); }
+  .opponent-toolbar { grid-template-columns: 1fr 1fr; }
+  .opponent-toolbar label:first-child { grid-column: 1 / -1; }
   .build-timeline { grid-template-columns: repeat(3, 1fr); }
   .archive-filters { grid-template-columns: repeat(3, 1fr); }
   .archive-search { grid-column: span 2; }
@@ -484,6 +512,10 @@ noscript { position: fixed; inset: auto 20px 20px; z-index: 4; padding: 12px 16p
   .profile-meta span::after { display: none; }
   .profile-actions { width: 100%; justify-content: space-between; }
   .metric-grid, .hero-grid, .session-grid { grid-template-columns: 1fr; }
+  .opponent-toolbar { grid-template-columns: 1fr; }
+  .opponent-toolbar label:first-child { grid-column: auto; }
+  .opponent-pagination { grid-template-columns: 1fr 1fr; }
+  .opponent-pagination span { grid-column: 1 / -1; grid-row: 1; }
   .metric-card { min-height: 145px; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .section-heading > p { text-align: left; }

@@ -4,10 +4,15 @@ const state = {
   recentMatches: [],
   historyPages: new Map(),
   reviewObserver: null,
+  opponentQuery: "",
+  opponentSort: "matches",
+  opponentMinMatches: 1,
+  opponentPage: 1,
 };
 
 const HERO_SAMPLE_MIN = 3;
 const SESSION_GAP_MS = 90 * 60 * 1000;
+const OPPONENT_PAGE_SIZE = 20;
 
 const numberFormat = new Intl.NumberFormat("de-DE");
 const decimalFormat = new Intl.NumberFormat("de-DE", {
@@ -985,6 +990,76 @@ function renderSessions(matches) {
   }
 }
 
+function renderOpponents() {
+  const body = byId("opponent-table-body");
+  if (!body) return;
+  const query = state.opponentQuery.toLocaleLowerCase("de");
+  const opponents = (state.data.opponents ?? [])
+    .filter((opponent) => opponent.matches >= state.opponentMinMatches)
+    .filter((opponent) => !query || `${opponent.name} ${opponent.accountId} ${opponent.steamId64}`.toLocaleLowerCase("de").includes(query))
+    .sort((a, b) => {
+      if (state.opponentSort === "winrate") return b.winrate - a.winrate || b.matches - a.matches;
+      if (state.opponentSort === "lossrate") return b.lossrate - a.lossrate || b.matches - a.matches;
+      return b.matches - a.matches || b.winrate - a.winrate;
+    });
+  const totalPages = Math.max(1, Math.ceil(opponents.length / OPPONENT_PAGE_SIZE));
+  state.opponentPage = Math.min(state.opponentPage, totalPages);
+  const visible = opponents.slice(
+    (state.opponentPage - 1) * OPPONENT_PAGE_SIZE,
+    state.opponentPage * OPPONENT_PAGE_SIZE,
+  );
+  body.replaceChildren();
+
+  if (!visible.length) {
+    const row = create("tr");
+    const cell = create("td", "opponent-empty", state.data.opponents?.length
+      ? "Keine Gegner entsprechen deiner Auswahl."
+      : "Noch keine Gegnerdaten verfügbar. Der nächste Datenlauf versucht es erneut.");
+    cell.colSpan = 6;
+    row.append(cell);
+    body.append(row);
+  }
+
+  for (const opponent of visible) {
+    const row = create("tr");
+    const identityCell = create("td");
+    const identity = create("a", "opponent-identity");
+    identity.href = opponent.profileUrl;
+    identity.target = "_blank";
+    identity.rel = "noreferrer";
+    if (opponent.avatar) {
+      const image = create("img");
+      image.src = opponent.avatar;
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      identity.append(image);
+    } else {
+      identity.append(create("span", "opponent-avatar-fallback", opponent.name.slice(0, 1).toUpperCase()));
+    }
+    const copy = create("span");
+    copy.append(create("strong", "", opponent.name), create("small", "", `Steam ${opponent.accountId}`));
+    identity.append(copy);
+    identityCell.append(identity);
+    row.append(
+      identityCell,
+      create("td", "opponent-match-count", numberFormat.format(opponent.matches)),
+      create("td", "positive", numberFormat.format(opponent.wins)),
+      create("td", "negative", numberFormat.format(opponent.losses)),
+      create("td", opponent.winrate >= 50 ? "positive" : "negative", `${percentFormat.format(opponent.winrate)}%`),
+      create("td", opponent.lossrate > 50 ? "negative" : "", `${percentFormat.format(opponent.lossrate)}%`),
+    );
+    body.append(row);
+  }
+
+  text("opponent-coverage", `${numberFormat.format(state.data.opponents?.length ?? 0)} unterschiedliche Gegner · vollständige Historie`);
+  text("opponent-page-status", opponents.length
+    ? `Seite ${state.opponentPage} von ${totalPages} · ${numberFormat.format(opponents.length)} Gegner`
+    : "0 Gegner");
+  byId("opponent-prev").disabled = state.opponentPage <= 1;
+  byId("opponent-next").disabled = state.opponentPage >= totalPages;
+}
+
 function renderHeroCards(groups) {
   const grid = byId("hero-grid");
   grid.replaceChildren();
@@ -1853,6 +1928,7 @@ function renderDashboard() {
   renderHeroSort();
   renderHeroCards(sortHeroGroups(heroGroups, state.heroSort));
   renderSessions(matches);
+  renderOpponents();
   renderMatches(state.recentMatches.length ? state.recentMatches : matches.slice(0, 12));
   drawRankChart(matches);
   text(
@@ -1908,6 +1984,29 @@ function showReady(data) {
   byId("enemy-analysis-button")?.addEventListener("click", openEnemyAnalysis);
   byId("match-archive-button")?.addEventListener("click", openMatchArchive);
   byId("progress-compare-button")?.addEventListener("click", openProgressComparison);
+  byId("opponent-search")?.addEventListener("input", (event) => {
+    state.opponentQuery = event.target.value.trim();
+    state.opponentPage = 1;
+    renderOpponents();
+  });
+  byId("opponent-sort")?.addEventListener("change", (event) => {
+    state.opponentSort = event.target.value;
+    state.opponentPage = 1;
+    renderOpponents();
+  });
+  byId("opponent-min-matches")?.addEventListener("change", (event) => {
+    state.opponentMinMatches = Number(event.target.value);
+    state.opponentPage = 1;
+    renderOpponents();
+  });
+  byId("opponent-prev")?.addEventListener("click", () => {
+    state.opponentPage = Math.max(1, state.opponentPage - 1);
+    renderOpponents();
+  });
+  byId("opponent-next")?.addEventListener("click", () => {
+    state.opponentPage += 1;
+    renderOpponents();
+  });
 
   text(
     "footer-update-time",

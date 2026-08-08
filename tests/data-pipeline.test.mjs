@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  accountIdToSteamId64,
   buildBasicMatchPlayersUrl,
   buildDashboardData,
   buildHeroCoach,
@@ -28,6 +29,7 @@ test("Steam profile references are parsed without exposing credentials", () => {
     { type: "vanity", value: "example-player" },
   );
   assert.equal(steamId64ToAccountId("76561197960265729"), 1);
+  assert.equal(accountIdToSteamId64(1), "76561197960265729");
   assert.throws(() => steamId64ToAccountId("123"), /17 Ziffern/);
 });
 
@@ -128,6 +130,13 @@ test("the complete raw match history is normalized", () => {
     heroMatchups: [
       { hero_id: 1, enemy_hero_id: 2, matches_played: 12, wins: 7 },
     ],
+    enemyStats: [{ enemy_id: 2, matches_played: 5, wins: 3 }],
+    opponentProfiles: [{
+      steamid: "76561197960265730",
+      personaname: "Known Rival",
+      avatarmedium: "https://example.com/rival.jpg",
+      profileurl: "https://steamcommunity.com/profiles/76561197960265730/",
+    }],
     generatedAt: "2026-08-04T12:00:00.000Z",
   });
 
@@ -159,12 +168,18 @@ test("the complete raw match history is normalized", () => {
   assert.equal(result.heroCoach["1"].matches, 53);
   assert.equal(result.matchups[0].enemyHeroId, 2);
   assert.equal(Math.round(result.matchups[0].winrate), 58);
+  assert.equal(result.opponents[0].name, "Known Rival");
+  assert.equal(result.opponents[0].matches, 5);
+  assert.equal(result.opponents[0].wins, 3);
+  assert.equal(result.opponents[0].losses, 2);
+  assert.equal(result.opponents[0].winrate, 60);
+  assert.equal(result.opponents[0].lossrate, 40);
   assert.equal(result.rankContext.currentBadge, 74);
   assert.equal(result.rankContext.percentile, 75);
   assert.equal(JSON.stringify(result).includes("STEAM_API_KEY"), false);
 
   const published = buildPublishedDataFiles(result);
-  assert.equal(published.dashboard.schemaVersion, 5);
+  assert.equal(published.dashboard.schemaVersion, 6);
   assert.equal(published.dashboard.matches.length, 105);
   assert.equal(published.dashboard.matches[0].historyPage, 1);
   assert.equal(published.dashboard.matches[104].historyPage, 2);

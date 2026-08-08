@@ -192,6 +192,57 @@
             <div class="session-grid" id="session-grid"></div>
           </section>
 
+          <section class="content-section" aria-labelledby="opponents-title">
+            <div class="section-heading">
+              <div>
+                <h2 id="opponents-title">Deine Gegnerbilanz</h2>
+              </div>
+              <p id="opponent-coverage">Vollständige Matchhistorie</p>
+            </div>
+            <div class="opponent-toolbar">
+              <label>
+                <span>Gegner suchen</span>
+                <input id="opponent-search" type="search" placeholder="Name oder Steam-ID …" autocomplete="off" />
+              </label>
+              <label>
+                <span>Sortierung</span>
+                <select id="opponent-sort">
+                  <option value="matches">Meiste Begegnungen</option>
+                  <option value="winrate">Höchste Winrate</option>
+                  <option value="lossrate">Höchste Lossrate</option>
+                </select>
+              </label>
+              <label>
+                <span>Stichprobe</span>
+                <select id="opponent-min-matches">
+                  <option value="1">Alle Gegner</option>
+                  <option value="2">Mindestens 2 Matches</option>
+                  <option value="3">Mindestens 3 Matches</option>
+                </select>
+              </label>
+            </div>
+            <div class="opponent-table-wrap">
+              <table class="opponent-table">
+                <thead>
+                  <tr>
+                    <th>Gegner</th>
+                    <th>Matches</th>
+                    <th>Siege</th>
+                    <th>Niederlagen</th>
+                    <th>Winrate</th>
+                    <th>Lossrate</th>
+                  </tr>
+                </thead>
+                <tbody id="opponent-table-body"></tbody>
+              </table>
+            </div>
+            <div class="opponent-pagination">
+              <button type="button" id="opponent-prev">← Zurück</button>
+              <span id="opponent-page-status">—</span>
+              <button type="button" id="opponent-next">Weiter →</button>
+            </div>
+          </section>
+
           <section class="content-section" aria-labelledby="matches-title">
             <div class="section-heading">
               <div>
