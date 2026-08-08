@@ -192,6 +192,34 @@
             <div class="session-grid" id="session-grid"></div>
           </section>
 
+          <section class="content-section" aria-labelledby="matches-title">
+            <div class="section-heading">
+              <div>
+                <h2 id="matches-title">Letzte Matches</h2>
+              </div>
+              <div class="match-heading-actions">
+                <p id="match-coverage">—</p>
+                <button type="button" class="insight-action is-primary" id="match-archive-button">Vollständiges Archiv →</button>
+              </div>
+            </div>
+            <div class="match-table-wrap">
+              <table class="match-table">
+                <thead>
+                  <tr>
+                    <th>Match</th>
+                    <th>Held</th>
+                    <th>Ergebnis</th>
+                    <th>K / D / A</th>
+                    <th>Souls / Min.</th>
+                    <th>Dauer</th>
+                    <th>Rang</th>
+                  </tr>
+                </thead>
+                <tbody id="match-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="content-section" aria-labelledby="opponents-title">
             <div class="section-heading">
               <div>
@@ -240,34 +268,6 @@
               <button type="button" id="opponent-prev">← Zurück</button>
               <span id="opponent-page-status">—</span>
               <button type="button" id="opponent-next">Weiter →</button>
-            </div>
-          </section>
-
-          <section class="content-section" aria-labelledby="matches-title">
-            <div class="section-heading">
-              <div>
-                <h2 id="matches-title">Letzte Matches</h2>
-              </div>
-              <div class="match-heading-actions">
-                <p id="match-coverage">—</p>
-                <button type="button" class="insight-action is-primary" id="match-archive-button">Vollständiges Archiv →</button>
-              </div>
-            </div>
-            <div class="match-table-wrap">
-              <table class="match-table">
-                <thead>
-                  <tr>
-                    <th>Match</th>
-                    <th>Held</th>
-                    <th>Ergebnis</th>
-                    <th>K / D / A</th>
-                    <th>Souls / Min.</th>
-                    <th>Dauer</th>
-                    <th>Rang</th>
-                  </tr>
-                </thead>
-                <tbody id="match-table-body"></tbody>
-              </table>
             </div>
           </section>
         </div>

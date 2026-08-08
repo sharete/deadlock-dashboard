@@ -29,6 +29,7 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(html, /id="progress-compare-button"/);
   assert.match(html, /id="opponent-table-body"/);
   assert.match(html, /id="opponent-search"/);
+  assert.ok(html.indexOf('id="matches-title"') < html.indexOf('id="opponents-title"'));
   assert.match(html, /id="session-grid"/);
   assert.match(html, /id="detail-dialog"/);
   assert.match(html, /\.\/dashboard\.js/);
@@ -53,6 +54,9 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /function openEnemyAnalysis/);
   assert.match(script, /function renderOpponents/);
   assert.match(script, /state\.data\.opponents/);
+  assert.match(script, /function steamProfileUrl/);
+  assert.match(script, /roster-steam-link/);
+  assert.match(script, /roster-detail-steam-link/);
   assert.match(script, /function openRankContext/);
   assert.match(script, /function openProgressComparison/);
   assert.match(script, /Fortschrittsvergleich/);

@@ -13,6 +13,7 @@ const state = {
 const HERO_SAMPLE_MIN = 3;
 const SESSION_GAP_MS = 90 * 60 * 1000;
 const OPPONENT_PAGE_SIZE = 20;
+const STEAM_ID64_BASE = 76561197960265728n;
 
 const numberFormat = new Intl.NumberFormat("de-DE");
 const decimalFormat = new Intl.NumberFormat("de-DE", {
@@ -22,6 +23,12 @@ const decimalFormat = new Intl.NumberFormat("de-DE", {
 const percentFormat = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 
 const byId = (id) => document.getElementById(id);
+
+function steamProfileUrl(accountId) {
+  const normalized = Number(accountId);
+  if (!Number.isInteger(normalized) || normalized <= 0 || normalized > 4_294_967_295) return null;
+  return `https://steamcommunity.com/profiles/${STEAM_ID64_BASE + BigInt(normalized)}/`;
+}
 
 function create(tagName, className, content) {
   const element = document.createElement(tagName);
@@ -1146,10 +1153,11 @@ function rosterColumn(title, players, onSelect) {
   const list = create("div", "roster-list");
   for (const player of players) {
     const hero = heroFor(player.heroId);
-    const item = create("button", `roster-player${player.isSelf ? " is-self" : ""}`);
-    item.type = "button";
-    item.setAttribute("aria-pressed", "false");
-    item.setAttribute("aria-label", `Build und Werte von ${hero.name} anzeigen`);
+    const item = create("div", `roster-player${player.isSelf ? " is-self" : ""}`);
+    const select = create("button", "roster-player-select");
+    select.type = "button";
+    select.setAttribute("aria-pressed", "false");
+    select.setAttribute("aria-label", `Build und Werte von ${hero.name} anzeigen`);
     const identity = create("span", "roster-identity");
     if (hero.image) {
       const image = create("img");
@@ -1163,8 +1171,18 @@ function rosterColumn(title, players, onSelect) {
     copy.append(create("strong", "", player.isSelf ? `${hero.name} · Du` : hero.name));
     copy.append(create("small", "", `${numberFormat.format(player.netWorth)} Net Worth`));
     identity.append(copy);
-    item.append(identity, create("strong", "roster-kda", `${player.kills}/${player.deaths}/${player.assists}`));
-    item.addEventListener("click", () => onSelect(player, item));
+    select.append(identity, create("strong", "roster-kda", `${player.kills}/${player.deaths}/${player.assists}`));
+    select.addEventListener("click", () => onSelect(player, item));
+    item.append(select);
+    const profileUrl = steamProfileUrl(player.accountId);
+    if (profileUrl) {
+      const profile = create("a", "roster-steam-link", "Steam ↗");
+      profile.href = profileUrl;
+      profile.target = "_blank";
+      profile.rel = "noreferrer";
+      profile.setAttribute("aria-label", `Steam-Profil des ${hero.name}-Spielers öffnen`);
+      item.append(profile);
+    }
     list.append(item);
   }
   column.append(list);
@@ -1193,7 +1211,17 @@ function renderRosterPlayerDetail(match, player, target) {
     create("p", "", `${player.kills}/${player.deaths}/${player.assists} · ${numberFormat.format(player.netWorth)} Net Worth`),
   );
   identity.append(copy);
-  header.append(identity, create("span", "roster-detail-hint", "Spieler wechseln: anderen Hero anklicken"));
+  const actions = create("div", "roster-detail-actions");
+  actions.append(create("span", "roster-detail-hint", "Spieler wechseln: anderen Hero anklicken"));
+  const profileUrl = steamProfileUrl(player.accountId);
+  if (profileUrl) {
+    const profile = create("a", "roster-detail-steam-link", "Steam-Profil ↗");
+    profile.href = profileUrl;
+    profile.target = "_blank";
+    profile.rel = "noreferrer";
+    actions.append(profile);
+  }
+  header.append(identity, actions);
   content.append(header);
   content.append(metricGrid([
     { label: "Player Damage", value: numberFormat.format(player.playerDamage) },
@@ -1711,7 +1739,7 @@ function openMatchDetail(match) {
     const selectPlayer = (player, button) => {
       for (const sibling of grid.querySelectorAll(".roster-player")) {
         sibling.classList.toggle("is-selected", sibling === button);
-        sibling.setAttribute("aria-pressed", String(sibling === button));
+        sibling.querySelector(".roster-player-select")?.setAttribute("aria-pressed", String(sibling === button));
       }
       renderRosterPlayerDetail(match, player, playerDetail);
     };
