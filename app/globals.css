@@ -99,6 +99,37 @@ button { color: inherit; }
   letter-spacing: 0.15em;
 }
 
+.language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+.language-switch button {
+  min-width: 42px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: 750 10px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.language-switch button:hover { color: var(--text); }
+.language-switch button[aria-pressed="true"] {
+  background: var(--acid);
+  color: #10140d;
+  box-shadow: 0 0 18px rgba(215, 255, 100, 0.14);
+}
+.language-switch button:focus-visible { outline: 2px solid var(--acid); outline-offset: 3px; }
+
 .state-badge, .panel-context {
   display: inline-flex;
   align-items: center;
@@ -507,6 +538,7 @@ noscript { position: fixed; inset: auto 20px 20px; z-index: 4; padding: 12px 16p
 @media (max-width: 720px) {
   .topbar, main, footer { width: min(100% - 30px, 1480px); }
   .topbar { min-height: 74px; }
+  .language-switch button { min-width: 38px; min-height: 30px; padding-inline: 9px; }
   .setup-view { min-height: auto; padding-block: 62px; }
   .setup-intro h1 { font-size: clamp(54px, 17vw, 82px); }
   .dashboard-view { padding-top: 22px; }

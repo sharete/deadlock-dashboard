@@ -11,7 +11,7 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
     readFile(new URL("app/globals.css", root), "utf8"),
   ]);
 
-  assert.match(html, /<html lang="de">/);
+  assert.match(html, /<html lang="en">/);
   assert.match(html, /<title>Deadlock Personal Dashboard<\/title>/);
   assert.match(html, /Dashboard made by/);
   assert.match(html, /id="footer-author"/);
@@ -29,6 +29,8 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(html, /id="progress-compare-button"/);
   assert.match(html, /id="opponent-table-body"/);
   assert.match(html, /id="opponent-search"/);
+  assert.match(html, /data-language="en"/);
+  assert.match(html, /data-language="de"/);
   assert.ok(html.indexOf('id="matches-title"') < html.indexOf('id="opponents-title"'));
   assert.match(html, /id="session-grid"/);
   assert.match(html, /id="detail-dialog"/);
@@ -53,6 +55,9 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(script, /function openCoach/);
   assert.match(script, /function openEnemyAnalysis/);
   assert.match(script, /function renderOpponents/);
+  assert.match(script, /function setLanguage/);
+  assert.match(script, /function localizeTree/);
+  assert.match(script, /deadlock-dashboard-language/);
   assert.match(script, /state\.data\.opponents/);
   assert.match(script, /function steamProfileUrl/);
   assert.match(script, /roster-steam-link/);
@@ -75,6 +80,7 @@ test("the GitHub Pages entrypoint contains the interactive dashboard", async () 
   assert.match(styles, /\.review-chart/);
   assert.match(styles, /\.review-insight-grid/);
   assert.match(styles, /\.opponent-table/);
+  assert.match(styles, /\.language-switch/);
   assert.doesNotMatch(styles, /backdrop-filter/);
   assert.doesNotMatch(`${html}\n${script}`, /STEAM_API_KEY\s*=|NEXT_PUBLIC_/);
 });

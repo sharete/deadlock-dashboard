@@ -1,5 +1,6 @@
 const state = {
   data: null,
+  locale: readStoredLanguage(),
   heroSort: "matches",
   recentMatches: [],
   historyPages: new Map(),
@@ -14,13 +15,432 @@ const HERO_SAMPLE_MIN = 3;
 const SESSION_GAP_MS = 90 * 60 * 1000;
 const OPPONENT_PAGE_SIZE = 20;
 const STEAM_ID64_BASE = 76561197960265728n;
+const LANGUAGE_STORAGE_KEY = "deadlock-dashboard-language";
 
-const numberFormat = new Intl.NumberFormat("de-DE");
-const decimalFormat = new Intl.NumberFormat("de-DE", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-const percentFormat = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
+function readStoredLanguage() {
+  try {
+    return localStorage.getItem("deadlock-dashboard-language") === "de" ? "de" : "en";
+  } catch {
+    return "en";
+  }
+}
+
+const ENGLISH_TEXT = new Map(Object.entries({
+  "Deadlock Personal Dashboard Startseite": "Deadlock Personal Dashboard home",
+  "Fast bereit.": "Almost ready.",
+  "Ein Profil fehlt.": "One profile is missing.",
+  "Der sichere Datenzugang steht. Jetzt muss nur noch dein öffentliches Steam-Profil mit dem Dashboard verbunden werden.": "Secure data access is ready. All that remains is connecting your public Steam profile to the dashboard.",
+  "Datenzugang": "Data access",
+  "2/4 bereit": "2/4 ready",
+  "50 Prozent der Einrichtung abgeschlossen": "50 percent of setup complete",
+  "Geschützt": "Protected",
+  "Steam-Profil": "Steam profile",
+  "SteamID64 fehlt": "SteamID64 missing",
+  "Wartet auf Profil": "Waiting for profile",
+  "API-Schlüssel bleiben in GitHub Actions. Die veröffentlichte Website erhält ausschließlich fertig aufbereitete Statistikdaten.": "API keys remain in GitHub Actions. The published website only receives fully processed statistics.",
+  "Rang wird geladen": "Loading rank",
+  "— Spielstunden": "— hours played",
+  "Letztes Match —": "Last match —",
+  "Fortschritt vergleichen →": "Compare progress →",
+  "Leistungsübersicht": "Performance overview",
+  "Kills + Assists pro Tod": "Kills + assists per death",
+  "Matchdauer": "Match duration",
+  "— analysiert": "— analyzed",
+  "Rangentwicklung": "Rank progression",
+  "Rank-Kontext →": "Rank context →",
+  "Verlauf des Deadlock-Rangs": "Deadlock rank history",
+  "Für einen Verlauf fehlen noch Rangdaten.": "There is not enough rank data for a timeline yet.",
+  "Aktuelle Form": "Current form",
+  "Siege aus den letzten 5": "Wins in the last 5",
+  "Ergebnisse der letzten fünf Matches": "Results from the last five matches",
+  "Serie": "Streak",
+  "Bester Held": "Best hero",
+  "Dein Hero Pool": "Your hero pool",
+  "Hero Pool sortieren": "Sort hero pool",
+  "Meiste Matches": "Most matches",
+  "Build- & Ability-Coach": "Build & ability coach",
+  "Gegner-Analyse →": "Opponent analysis →",
+  "Erweiterte Hero-Analysen": "Advanced hero analysis",
+  "Deine Spielsessions": "Your play sessions",
+  "Die letzten sechs Sessions · Matches mit höchstens 90 Minuten Abstand werden zusammengefasst.": "The last six sessions · matches no more than 90 minutes apart are grouped together.",
+  "Letzte Matches": "Recent matches",
+  "Vollständiges Archiv →": "Full archive →",
+  "Held": "Hero",
+  "Ergebnis": "Result",
+  "Dauer": "Duration",
+  "Rang": "Rank",
+  "Deine Gegnerbilanz": "Your opponent record",
+  "Vollständige Matchhistorie": "Complete match history",
+  "Gegner suchen": "Search opponents",
+  "Name oder Steam-ID …": "Name or Steam ID …",
+  "Sortierung": "Sort by",
+  "Meiste Begegnungen": "Most encounters",
+  "Höchste Winrate": "Highest win rate",
+  "Höchste Lossrate": "Highest loss rate",
+  "Stichprobe": "Sample size",
+  "Alle Gegner": "All opponents",
+  "Mindestens 2 Matches": "At least 2 matches",
+  "Mindestens 3 Matches": "At least 3 matches",
+  "Gegner": "Opponent",
+  "Siege": "Wins",
+  "Niederlagen": "Losses",
+  "Lossrate": "Loss rate",
+  "← Zurück": "← Back",
+  "Weiter →": "Next →",
+  "Detailansicht schließen": "Close details",
+  "Noch keine Live-Daten": "No live data yet",
+  "Für die interaktive Auswertung muss JavaScript aktiviert sein.": "JavaScript must be enabled for the interactive analysis.",
+  "unbekannt": "unknown",
+  "Ohne Rangdaten": "No rank data",
+  "Ohne aktuelle Rangdaten": "No current rank data",
+  "Sieg": "Win",
+  "Niederlage": "Loss",
+  "Kein Match": "No match",
+  "Zeitraum unbekannt": "Unknown period",
+  "Aufwärtstrend": "Upward trend",
+  "Rückgang": "Decline",
+  "Ausgeglichen": "Balanced",
+  "Gesamttrend": "Overall trend",
+  "Aktueller Zeitraum": "Current period",
+  "Vergleichszeitraum": "Comparison period",
+  "Bilanz aktuell": "Current record",
+  "Leistungsentwicklung": "Performance development",
+  "Hero-Veränderung": "Hero changes",
+  "Aktuell meistgespielt": "Currently most played",
+  "Davor meistgespielt": "Previously most played",
+  "Hero-Pool aktuell": "Current hero pool",
+  "Hero-Pool davor": "Previous hero pool",
+  "Fortschrittsvergleich": "Progress comparison",
+  "Gleich große, direkt aufeinanderfolgende Match-Zeiträume – ohne globale Vergleichswerte.": "Equal, consecutive match periods without global reference values.",
+  "Noch keine Daten": "No data yet",
+  "Positives Signal": "Positive signal",
+  "Häufigster Ability-Start": "Most common ability opener",
+  "Mindestens drei Käufe nötig": "At least three purchases required",
+  "Deine häufigsten Items": "Your most common items",
+  "Kleine Stichprobe": "Small sample",
+  "Deine häufigsten Ability-Startfolgen": "Your most common ability opening sequences",
+  "Gegner-Analyse": "Opponent analysis",
+  "Dein Hero": "Your hero",
+  "Alle Heroes": "All heroes",
+  "Schwierigste Gegner": "Toughest opponents",
+  "Niedrigste persönliche Winrate · mindestens drei Begegnungen.": "Lowest personal win rate · at least three encounters.",
+  "Beste Bilanz": "Best record",
+  "Höchste persönliche Winrate · mindestens drei Begegnungen.": "Highest personal win rate · at least three encounters.",
+  "Matchups aus deiner vollständigen persönlichen Historie": "Matchups from your complete personal history",
+  "Aktueller Rang": "Current rank",
+  "Globaler Kontext": "Global context",
+  "Keine Verteilung verfügbar": "No distribution available",
+  "Persönlicher Peak": "Personal peak",
+  "Trend letzte 10": "Last 10 trend",
+  "Rangverteilung der letzten 30 Tage": "Rank distribution over the last 30 days",
+  "Die globale Rangverteilung ist momentan nicht verfügbar.": "The global rank distribution is currently unavailable.",
+  "Dein Rang im Kontext": "Your rank in context",
+  "Persönlicher Verlauf und Einordnung unter aktiven Ranked-Spielern": "Personal progression and position among active ranked players",
+  "Suche": "Search",
+  "Hero oder Match-ID": "Hero or match ID",
+  "Keine Matches entsprechen diesen Filtern.": "No matches match these filters.",
+  "Alle Ergebnisse": "All results",
+  "Alle Modi": "All modes",
+  "Neueste zuerst": "Newest first",
+  "Älteste zuerst": "Oldest first",
+  "Beste KDA": "Best KDA",
+  "Höchste SPM": "Highest SPM",
+  "Vollständiges Matcharchiv": "Complete match archive",
+  "Datum unbekannt": "Date unknown",
+  "Ungewertet": "Unrated",
+  "Deine Werte im globalen Vergleich": "Your stats compared globally",
+  "Globaler Durchschnitt": "Global average",
+  "Persönliche Bestwerte": "Personal bests",
+  "Meiste Kills": "Most kills",
+  "Meiste Assists": "Most assists",
+  "Bilanz": "Record",
+  "Top Hero": "Top hero",
+  "Keine Gegner entsprechen deiner Auswahl.": "No opponents match your selection.",
+  "Noch keine Gegnerdaten verfügbar. Der nächste Datenlauf versucht es erneut.": "No opponent data is available yet. The next data run will try again.",
+  "Details zu Hero öffnen": "Open hero details",
+  "Build und Werte anzeigen": "Show build and stats",
+  "DEINE PERFORMANCE": "YOUR PERFORMANCE",
+  "DEIN TEAM": "YOUR TEAM",
+  "GEGNERTEAM": "ENEMY TEAM",
+  "Spieler wechseln: anderen Hero anklicken": "Switch player: select another hero",
+  "Steam-Profil ↗": "Steam profile ↗",
+  "Damage erhalten": "Damage taken",
+  "Trefferquote": "Accuracy",
+  "Keine Daten": "No data",
+  "Item-Build": "Item build",
+  "Kaufreihenfolge und Zeitpunkte dieses Spielers.": "This player's purchase order and timings.",
+  "Ability-Reihenfolge": "Ability order",
+  "Zeitliche Reihenfolge der Ability-Upgrades dieses Spielers.": "This player's ability upgrade order over time.",
+  "Für diesen Spieler sind keine Build-Ereignisse verfügbar.": "No build events are available for this player.",
+  "Dein Team": "Your team",
+  "Gegnerteam": "Enemy team",
+  "Dein Net Worth": "Your net worth",
+  "Teamvergleich": "Team comparison",
+  "Finale Teamwerte aus dem Match.": "Final team stats from the match.",
+  "Economy-Verlauf": "Economy timeline",
+  "Team-Net-Worth über den Matchverlauf.": "Team net worth across the match.",
+  "Dein persönlicher Net-Worth-Verlauf.": "Your personal net worth timeline.",
+  "Economy-Verlauf dieses Matches": "Economy timeline for this match",
+  "Review-Hinweise": "Review insights",
+  "Datenbasierte Auffälligkeiten – als Ausgangspunkt für deine eigene Bewertung.": "Data-driven observations as a starting point for your own review.",
+  "Für dieses ältere Match liegen noch keine vollständigen Zeitreihen oder Teamdaten vor.": "Complete timeline or team data is not available for this older match.",
+  "Killbeteiligung": "Kill participation",
+  "Teamdaten fehlen": "Team data missing",
+  "Economy-Rang": "Economy rank",
+  "Nach finalem Net Worth": "By final net worth",
+  "Damage-Rang": "Damage rank",
+  "Im gesamten Match": "Across the full match",
+  "Death-Ausfallzeit": "Time dead",
+  "Performance-Profil": "Performance profile",
+  "Detaillierte Werte aus den verarbeiteten Matchdaten.": "Detailed stats from the processed match data.",
+  "Gegen deinen Durchschnitt": "Compared with your average",
+  "Vergleich mit deiner vollständigen Matchhistorie.": "Comparison with your complete match history.",
+  "Teamaufstellung": "Team roster",
+  "Hero anklicken, um dessen vollständigen Build und Performance-Werte zu öffnen.": "Select a hero to open their complete build and performance stats.",
+  "Wähle einen Hero aus der Teamaufstellung aus.": "Select a hero from the team roster.",
+  "Kaufreihenfolge und Zeitpunkte innerhalb des Matches.": "Purchase order and timings during the match.",
+  "Zeitliche Reihenfolge deiner Ability-Upgrades.": "Your ability upgrade order over time.",
+  "Net Worth · 12 Min.": "Net worth · 12 min",
+  "ungewertet": "unrated",
+  "Für den Coach sind noch keine vollständigen Build-Daten verfügbar.": "Complete build data is not available for the coach yet.",
+  "Muster aus deiner vollständigen Matchhistorie": "Patterns from your complete match history",
+  "Ausgewertet wird, ob der Gegner-Hero im anderen Team stand – unabhängig von Lane oder Rolle.": "This evaluates whether the opposing hero was on the other team, regardless of lane or role.",
+  "Für diese Auswahl gibt es noch keine belastbare Gegner-Stichprobe.": "There is not yet a reliable opponent sample for this selection.",
+  "Höher eingestuft als": "Ranked higher than",
+  "Für diesen Coach sind noch keine vollständigen Build-Daten verfügbar.": "Complete build data is not available for this coach yet.",
+  "Aus deiner vollständigen Matchhistorie mit diesem Hero.": "From your complete match history with this hero.",
+  "vs. Gesamt": "vs. overall",
+  "Details": "Details",
+  "verkauft": "sold",
+  "Gegner · 12 Min.": "Opponent · 12 min",
+  "Lane-Gruppe · Ende": "Lane group · final",
+  "Patron zerstört": "Patron destroyed",
+  "Patron-Phase erreicht": "Patron phase reached",
+  "Schildgenerator zerstört": "Shield generator destroyed",
+  "Objective zerstört": "Objective destroyed",
+  "von deinem Team besiegt": "defeated by your team",
+  "vom Gegner besiegt": "defeated by the enemy",
+  "Claim gesichert": "Claim secured",
+  "Claim beim Gegner": "Claim taken by enemy",
+  "Kill erzielt": "Kill secured",
+  "Größter Economy-Gewinn": "Largest economy gain",
+  "Größter Economy-Verlust": "Largest economy loss",
+  "Führung nicht geschlossen": "Lead not converted",
+  "Comeback-Sieg": "Comeback win",
+  "Burst-Deaths prüfen": "Review burst deaths",
+  "Späte Ausfallzeiten": "Late downtime",
+  "Niedrige Killbeteiligung": "Low kill participation",
+  "Economy nicht vollständig umgesetzt": "Economy not fully converted",
+  "Starke Lane-Economy": "Strong lane economy",
+  "Lane-Economy im Rückstand": "Lane economy deficit",
+  "Stabiles Matchprofil": "Stable match profile",
+  "Kein einzelnes Warnsignal dominiert. Nutze Economy-Kurve und Schlüsselereignisse für die manuelle Detailprüfung.": "No single warning signal dominates. Use the economy curve and key events for your manual review.",
+  "Zeitverlauf, Teamkontext und konkrete Review-Punkte aus den verfügbaren Matchdaten.": "Timeline, team context, and concrete review points from the available match data.",
+  "Schlüsselereignisse": "Key events",
+  "Priorisierte Objectives, Deaths, Power-Spikes und Economy-Swings.": "Prioritized objectives, deaths, power spikes, and economy swings.",
+  "Daten momentan nicht erreichbar": "Data is currently unavailable",
+}));
+
+const ENGLISH_PATTERNS = [
+  [/^vor weniger als 1 Stunde$/, "less than 1 hour ago"],
+  [/^vor (\d+) Std\.$/, "$1h ago"],
+  [/^vor (\d+) Tag$/, "$1 day ago"],
+  [/^vor (\d+) Tagen$/, "$1 days ago"],
+  [/^Letztes Match (.+)$/, "Last match $1"],
+  [/^(\d+) Spielstunden$/, "$1 hours played"],
+  [/^(\d+) Siege · (\d+) Niederlagen$/, "$1 wins · $2 losses"],
+  [/^(\d+) Matches analysiert$/, "$1 matches analyzed"],
+  [/^(\d+) von (\d+) verfügbaren Matches geladen$/, "$1 of $2 available matches loaded"],
+  [/^(\d+) unterschiedliche Gegner · vollständige Historie$/, "$1 unique opponents · complete history"],
+  [/^Seite (\d+) von (\d+) · (\d+) Gegner$/, "Page $1 of $2 · $3 opponents"],
+  [/^(\d+) Gegner$/, "$1 opponents"],
+  [/^(\d+) Begegnungen$/, "$1 encounters"],
+  [/^(\d+) Siege$/, "$1 wins"],
+  [/^(\d+) erfasste Matches$/, "$1 recorded matches"],
+  [/^(\d+) Treffer$/, "$1 hits"],
+  [/^(\d+) erfasste Deaths$/, "$1 recorded deaths"],
+  [/^(\d+) Beteiligungen$/, "$1 participations"],
+  [/^(\d+) Matches · Seite (\d+) von (\d+)$/, "$1 matches · page $2 of $3"],
+  [/^(\d+) Matches · filterbar und chronologisch durchsuchbar$/, "$1 matches · filterable and chronologically searchable"],
+  [/^(\d+) Matches in deiner vollständigen Historie$/, "$1 matches in your complete history"],
+  [/^(\d+) Match in deiner vollständigen Historie$/, "$1 match in your complete history"],
+  [/^Nach den meisten Matches in der vollständigen Historie\.$/, "By most matches in the complete history."],
+  [/^Nach höchster Winrate · mindestens (\d+) Matches für das Ranking\.$/, "By highest win rate · at least $1 matches to qualify."],
+  [/^Nach höchstem KDA · mindestens (\d+) Matches für das Ranking\.$/, "By highest KDA · at least $1 matches to qualify."],
+  [/^Details zu (.+) öffnen$/, "Open details for $1"],
+  [/^Matchdetails zu (.+) öffnen$/, "Open match details for $1"],
+  [/^Build und Werte von (.+) anzeigen$/, "Show build and stats for $1"],
+  [/^Steam-Profil des (.+)-Spielers öffnen$/, "Open the $1 player's Steam profile"],
+  [/^(.+) · Du$/, "$1 · You"],
+  [/^(\d+) Fortschritt$/, "$1 progress"],
+  [/^Letztes Update (.+)$/, "Last update $1"],
+  [/^(.+) auf Steam$/, "$1 on Steam"],
+  [/^Höher eingestuft als (.+)%$/, "Ranked higher than $1%"],
+  [/^([+−].+) Pkt\.$/, "$1 pts."],
+  [/^Sieg · ungewertet$/, "Win · unrated"],
+  [/^Niederlage · ungewertet$/, "Loss · unrated"],
+  [/^Für diesen Vergleich werden (\d+) Matches benötigt\. Aktuell sind (\d+) Matches verfügbar\.$/, "This comparison requires $1 matches. $2 matches are currently available."],
+  [/^(\d+) von 6 Kernwerten verbessert$/, "$1 of 6 core metrics improved"],
+  [/^Die letzten (\d+) Matches im direkten Vergleich mit den (\d+) Matches davor\.$/, "The latest $1 matches compared directly with the previous $2 matches."],
+  [/^(.+) · aktuell$/, "$1 · current"],
+  [/^Davor (.+)$/, "Previous $1"],
+  [/^Dein Schwerpunkt bleibt bei (.+)\.$/, "Your focus remains on $1."],
+  [/^Dein Schwerpunkt hat sich von (.+) zu (.+) verschoben\.$/, "Your focus shifted from $1 to $2."],
+  [/^In den letzten (\d+) Matches$/, "In the last $1 matches"],
+  [/^In den (\d+) Matches davor$/, "In the previous $1 matches"],
+  [/^Aus deinen (\d+) erfassten (.+)-Matches\. Zusammenhänge sind Hinweise, keine garantierte Ursache\.$/, "Based on your $1 recorded matches with $2. Correlations are signals, not guaranteed causes."],
+  [/^(\d+)% deiner Matches$/, "$1% of your matches"],
+  [/^(.+) vs\. Hero-Bilanz$/, "$1 vs. hero record"],
+  [/^(\d+) Matches · (\d+)% Pickrate$/, "$1 matches · $2% pick rate"],
+  [/^Deine Bilanz mit (.+), wenn der jeweilige Gegner-Hero im anderen Team stand\.$/, "Your record with $1 when the opposing hero was on the other team."],
+  [/^(\d+) Ranked Matches erfasst$/, "$1 ranked matches recorded"],
+  [/^(\d+) aktive Spieler im verfügbaren API-Zeitraum\.$/, "$1 active players in the available API period."],
+  [/^Kleine Stichprobe: Erst ab (\d+) Matches fließt ein Hero in die Winrate- und KDA-Rangliste ein\.$/, "Small sample: a hero qualifies for the win rate and KDA ranking from $1 matches onward."],
+  [/^Verglichen mit dem Durchschnitt aus (.+) weltweit erfassten (.+)-Matches\.$/, "Compared with the average from $1 globally recorded matches with $2."],
+  [/^Globaler Durchschnitt (.+)$/, "Global average $1"],
+  [/^Die letzten (\d+) Auftritte mit (.+)\.$/, "The last $1 appearances with $2."],
+  [/^(.+) vs\. Gesamt$/, "$1 vs. overall"],
+  [/^Top Hero: (.+)$/, "Top hero: $1"],
+  [/^(.+) · verkauft (.+)$/, "$1 · sold $2"],
+  [/^(.+) gegen (.+)$/, "$1 vs. $2"],
+  [/^von deinem Team besiegt · Claim gesichert$/, "Defeated by your team · claim secured"],
+  [/^von deinem Team besiegt · Claim beim Gegner$/, "Defeated by your team · claim taken by enemy"],
+  [/^vom Gegner besiegt · Claim gesichert$/, "Defeated by the enemy · claim secured"],
+  [/^vom Gegner besiegt · Claim beim Gegner$/, "Defeated by the enemy · claim taken by enemy"],
+  [/^(.+) zur Gegner-Lane$/, "$1 vs. the opposing lane"],
+  [/^(\d+) Kills im Zeitfenster$/, "$1 kills in the time window"],
+  [/^(\d+) Kills bis Minute (\d+)$/, "$1 kills by minute $2"],
+  [/^(.+) Net Worth im Messintervall$/, "$1 net worth in the measurement interval"],
+  [/^(\d+) Sek\. Ausfall$/, "$1 sec. downtime"],
+  [/^(\d+) Sek\. Ausfall · (.+) Sek\. TTK$/, "$1 sec. downtime · $2 sec. TTK"],
+  [/^Dein Team lag zwischenzeitlich (.+) Net Worth vorn\. Prüfe im Verlauf den Umschwung nach diesem Peak\.$/, "Your team held a temporary $1 net worth lead. Review the reversal after this peak."],
+  [/^Das Team drehte einen Rückstand von (.+) Net Worth\. Die Phase vor dem größten Swing ist besonders review-würdig\.$/, "The team overcame a $1 net worth deficit. The phase before the largest swing is especially worth reviewing."],
+  [/^(\d+) Deaths passierten in höchstens vier Sekunden\. Positionierung, Defensive-Aktivierung und Gegner-Cooldowns sind hier die ersten Review-Punkte\.$/, "$1 deaths happened within four seconds. Positioning, defensive activation, and enemy cooldowns are the first review points."],
+  [/^(\d+) Deaths lagen nach Minute 25\. In dieser Phase sind lange Respawn-Zeiten besonders teuer\.$/, "$1 deaths occurred after minute 25. Long respawn times are especially costly at this stage."],
+  [/^(.+)% Beteiligung an den Team-Kills\. Prüfe Rotationen und ob Fights zu spät erreicht wurden\.$/, "$1% participation in team kills. Review rotations and whether fights were reached too late."],
+  [/^Economy-Rang (\d+), aber Damage-Rang (\d+)\. Prüfe die Fights nach deinen großen Item-Timings\.$/, "Economy rank $1, but damage rank $2. Review the fights after your major item timings."],
+  [/^Nach zwölf Minuten lag deine Lane-Gruppe (.+) Net Worth vorn\.$/, "After twelve minutes, your lane group held a $1 net worth lead."],
+  [/^Nach zwölf Minuten lag deine Lane-Gruppe (.+) Net Worth hinten\.$/, "After twelve minutes, your lane group was $1 net worth behind."],
+];
+
+const textSources = new WeakMap();
+const attributeSources = new WeakMap();
+
+function localeCode() {
+  return state.locale === "de" ? "de-DE" : "en-US";
+}
+
+function translateText(source) {
+  const value = String(source ?? "");
+  if (state.locale === "de" || !value.trim()) return value;
+  const leading = value.match(/^\s*/)?.[0] ?? "";
+  const trailing = value.match(/\s*$/)?.[0] ?? "";
+  const core = value.trim();
+  const exact = ENGLISH_TEXT.get(core);
+  if (exact) return `${leading}${exact}${trailing}`;
+  for (const [pattern, replacement] of ENGLISH_PATTERNS) {
+    if (pattern.test(core)) return `${leading}${core.replace(pattern, replacement)}${trailing}`;
+  }
+  return value;
+}
+
+function setLocalizedText(element, source) {
+  const original = String(source ?? "");
+  element.textContent = translateText(original);
+  if (element.firstChild) textSources.set(element.firstChild, original);
+}
+
+function localizeTextNode(node) {
+  const source = textSources.get(node) ?? node.nodeValue;
+  textSources.set(node, source);
+  const translated = translateText(source);
+  if (node.nodeValue !== translated) node.nodeValue = translated;
+}
+
+function localizeAttributes(element) {
+  for (const name of ["aria-label", "title", "placeholder"]) {
+    if (!element.hasAttribute(name)) continue;
+    let sources = attributeSources.get(element);
+    if (!sources) {
+      sources = new Map();
+      attributeSources.set(element, sources);
+    }
+    const source = sources.get(name) ?? element.getAttribute(name);
+    sources.set(name, source);
+    const translated = translateText(source);
+    if (element.getAttribute(name) !== translated) element.setAttribute(name, translated);
+  }
+}
+
+function localizeTree(root = document.documentElement) {
+  if (root.nodeType === Node.TEXT_NODE) {
+    localizeTextNode(root);
+    return;
+  }
+  if (!(root instanceof Element)) return;
+  localizeAttributes(root);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (node.nodeType === Node.TEXT_NODE) localizeTextNode(node);
+    else localizeAttributes(node);
+    node = walker.nextNode();
+  }
+}
+
+function updateLanguageSwitch() {
+  document.documentElement.lang = state.locale;
+  for (const button of document.querySelectorAll("[data-language]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.language === state.locale));
+  }
+}
+
+function setLanguage(locale, { persist = true } = {}) {
+  state.locale = locale === "de" ? "de" : "en";
+  if (persist) {
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, state.locale);
+    } catch {
+      // The language switch still works when browser storage is unavailable.
+    }
+  }
+  updateLanguageSwitch();
+  if (state.data) {
+    renderProfileSummary(state.data);
+    renderDashboard();
+  }
+  localizeTree();
+}
+
+function initLanguage() {
+  updateLanguageSwitch();
+  for (const button of document.querySelectorAll("[data-language]")) {
+    button.addEventListener("click", () => setLanguage(button.dataset.language));
+  }
+  localizeTree();
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) localizeTree(node);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+const numberFormatters = Object.fromEntries(["en", "de"].map((locale) => {
+  const code = locale === "de" ? "de-DE" : "en-US";
+  return [locale, {
+    number: new Intl.NumberFormat(code),
+    decimal: new Intl.NumberFormat(code, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    percent: new Intl.NumberFormat(code, { maximumFractionDigits: 0 }),
+  }];
+}));
+const numberFormat = { format: (value) => numberFormatters[state.locale].number.format(value) };
+const decimalFormat = {
+  format: (value) => numberFormatters[state.locale].decimal.format(value),
+};
+const percentFormat = {
+  format: (value) => numberFormatters[state.locale].percent.format(value),
+};
 
 const byId = (id) => document.getElementById(id);
 
@@ -33,13 +453,13 @@ function steamProfileUrl(accountId) {
 function create(tagName, className, content) {
   const element = document.createElement(tagName);
   if (className) element.className = className;
-  if (content != null) element.textContent = String(content);
+  if (content != null) setLocalizedText(element, content);
   return element;
 }
 
 function text(id, value) {
   const element = byId(id);
-  if (element) element.textContent = value;
+  if (element) setLocalizedText(element, value);
 }
 
 function average(values) {
@@ -60,7 +480,7 @@ function formatRelativeDate(iso) {
   if (deltaHours < 24) return `vor ${Math.floor(deltaHours)} Std.`;
   const days = Math.floor(deltaHours / 24);
   if (days < 30) return `vor ${days} ${days === 1 ? "Tag" : "Tagen"}`;
-  return new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat(localeCode(), { dateStyle: "medium" }).format(date);
 }
 
 function countryFlag(code) {
@@ -316,7 +736,7 @@ function progressPeriod(matches) {
     .filter((date) => date && !Number.isNaN(date.getTime()))
     .sort((a, b) => a - b);
   if (!dates.length) return "Zeitraum unbekannt";
-  const format = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", year: "2-digit" });
+  const format = new Intl.DateTimeFormat(localeCode(), { day: "2-digit", month: "short", year: "2-digit" });
   return dates.length === 1
     ? format.format(dates[0])
     : `${format.format(dates[0])} – ${format.format(dates.at(-1))}`;
@@ -852,7 +1272,7 @@ function compactMatchList(matches) {
         "small",
         "",
         match.startedAt
-          ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(match.startedAt))
+          ? new Intl.DateTimeFormat(localeCode(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(match.startedAt))
           : "Datum unbekannt",
       ),
     );
@@ -974,10 +1394,10 @@ function renderSessions(matches) {
     const header = create("div", "session-card-header");
     header.append(
       create("span", "session-rank", String(index + 1).padStart(2, "0")),
-      create("strong", "", newest ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" }).format(newest) : "Datum unbekannt"),
+      create("strong", "", newest ? new Intl.DateTimeFormat(localeCode(), { dateStyle: "medium" }).format(newest) : "Datum unbekannt"),
     );
     const timeRange = newest && oldest
-      ? `${new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(oldest)}–${new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(newest)}`
+      ? `${new Intl.DateTimeFormat(localeCode(), { hour: "2-digit", minute: "2-digit" }).format(oldest)}–${new Intl.DateTimeFormat(localeCode(), { hour: "2-digit", minute: "2-digit" }).format(newest)}`
       : "—";
     header.append(create("small", "", timeRange));
     card.append(header);
@@ -1760,7 +2180,7 @@ function openMatchDetail(match) {
     eyebrow: "DEEP MATCH REVIEW",
     title: `${hero.name} · #${match.id.slice(-7)}`,
     subtitle: match.startedAt
-      ? new Intl.DateTimeFormat("de-DE", { dateStyle: "full", timeStyle: "short" }).format(new Date(match.startedAt))
+      ? new Intl.DateTimeFormat(localeCode(), { dateStyle: "full", timeStyle: "short" }).format(new Date(match.startedAt))
       : "Datum unbekannt",
     body,
   });
@@ -1799,7 +2219,7 @@ function renderMatches(matches) {
     matchStrong.textContent = `#${match.id.slice(-7)}`;
     const matchDate = document.createElement("small");
     matchDate.textContent = match.startedAt
-      ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(match.startedAt))
+      ? new Intl.DateTimeFormat(localeCode(), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(match.startedAt))
       : "Datum unbekannt";
     matchId.append(matchStrong, matchDate);
     matchCell.append(matchId);
@@ -1940,7 +2360,7 @@ function drawRankChart(matches) {
   for (const index of [...new Set(labels)]) {
     const date = points[index].startedAt ? new Date(points[index].startedAt) : null;
     ctx.fillText(
-      date ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short" }).format(date) : "—",
+      date ? new Intl.DateTimeFormat(localeCode(), { day: "2-digit", month: "short" }).format(date) : "—",
       x(index),
       height - 9,
     );
@@ -1965,10 +2385,7 @@ function renderDashboard() {
   );
 }
 
-function showReady(data) {
-  state.data = data;
-  byId("setup-view").hidden = true;
-  byId("dashboard-view").hidden = false;
+function renderProfileSummary(data) {
   const profile = data.profile;
   text("profile-name", profile.name);
   const avatar = byId("profile-avatar");
@@ -1988,6 +2405,17 @@ function showReady(data) {
   else steamLink.hidden = true;
   const footerAuthor = byId("footer-author");
   if (profile.profileUrl) footerAuthor.href = profile.profileUrl;
+  text(
+    "footer-update-time",
+    `Letztes Update ${new Intl.DateTimeFormat(localeCode(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.generatedAt))}`,
+  );
+}
+
+function showReady(data) {
+  state.data = data;
+  byId("setup-view").hidden = true;
+  byId("dashboard-view").hidden = false;
+  renderProfileSummary(data);
 
   byId("detail-close").addEventListener("click", closeDetail);
   byId("detail-dialog").addEventListener("close", () => {
@@ -2036,11 +2464,6 @@ function showReady(data) {
     renderOpponents();
   });
 
-  text(
-    "footer-update-time",
-    `Letztes Update ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.generatedAt))}`,
-  );
-
   renderDashboard();
   let resizeFrame;
   window.addEventListener("resize", () => {
@@ -2082,4 +2505,5 @@ async function init() {
   }
 }
 
+initLanguage();
 init();
